@@ -81,6 +81,15 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
               />
             </label>
             <label className="block">
+              Array Size
+              <input
+                type="number"
+                value={config.tree.arraySize}
+                onChange={(e) => handleChange('tree', 'arraySize', e.target.value)}
+                className="w-full mt-1 px-2 py-1 border rounded"
+              />
+            </label>
+            <label className="block">
               Density
               <input
                 type="number"
@@ -133,6 +142,15 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
               />
             </label>
             <label className="block">
+              Array Size
+              <input
+                type="number"
+                value={config.deer.arraySize}
+                onChange={(e) => handleChange('deer', 'arraySize', e.target.value)}
+                className="w-full mt-1 px-2 py-1 border rounded"
+              />
+            </label>
+            <label className="block">
               Maturity Age
               <input
                 type="number"
@@ -147,6 +165,17 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
                 type="number"
                 value={config.deer.staminaFactor}
                 onChange={(e) => handleChange('deer', 'staminaFactor', e.target.value)}
+                className="w-full mt-1 px-2 py-1 border rounded"
+              />
+            </label>
+            <label className="block">
+              Migration Factor
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={config.deer.migrationFactor}
+                onChange={(e) => handleChange('deer', 'migrationFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
             </label>
@@ -176,6 +205,15 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
               />
             </label>
             <label className="block">
+              Array Size
+              <input
+                type="number"
+                value={config.wolf.arraySize}
+                onChange={(e) => handleChange('wolf', 'arraySize', e.target.value)}
+                className="w-full mt-1 px-2 py-1 border rounded"
+              />
+            </label>
+            <label className="block">
               Maturity Age
               <input
                 type="number"
@@ -192,6 +230,17 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
                 onChange={(e) => handleChange('wolf', 'staminaFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
+            </label>
+            <label className="block">
+            Migration Factor
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              value={config.wolf.migrationFactor}
+              onChange={(e) => handleChange('wolf', 'migrationFactor', e.target.value)}
+              className="w-full mt-1 px-2 py-1 border rounded"
+            />
             </label>
             <label className="block">
               Hunger Factor

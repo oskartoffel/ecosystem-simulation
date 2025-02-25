@@ -1,9 +1,9 @@
 // DebugInterface.jsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { SimulationManager } from '../simulation/SimulationManager';
 import EcosystemVisualization from './EcosystemVisualization';
 import ParameterControls from './ParameterControls';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const DebugInterface = () => {
   const [mode, setMode] = useState('select'); // 'select', 'visualize', or 'debug'
@@ -12,10 +12,13 @@ const DebugInterface = () => {
   const [currentYear, setCurrentYear] = useState(0);
   const [simulationData, setSimulationData] = useState([]);
   const [debugLogs, setDebugLogs] = useState([]);
+  const consoleLogRef = useRef(console.log);
+  const consoleWarnRef = useRef(console.warn);
+  const consoleErrorRef = useRef(console.error);
 
   const defaultConfig = {
     gridSize: 10000,
-    years: 20,
+    years: 20,  // or appropriate value
     stabilizationYears: 10,
     tree: {
       initial: 1000,
@@ -24,22 +27,24 @@ const DebugInterface = () => {
       ageAvg: 30,
       ageSigma: 20,
       maturity: 10,
-      stressIndex: 90
+      stressIndex: 85  // Slightly lower than 90 to allow more young trees
     },
     deer: {
       initial: 20,
-      arraySize: 200,
+      arraySize: 500,  // Increased from 200
       maturity: 2,
-      staminaFactor: 100000.0,
-      hungerFactor: 2.0
+      staminaFactor: 10000.0,  // Reduced from 100000.0
+      hungerFactor: 5.0,       // Increased from 2.0
+      migrationFactor: 1.0     // New parameter
     },
     wolf: {
       initial: 5,
-      arraySize: 100,
+      arraySize: 200,  // Increased from 100
       maturity: 2,
-      staminaFactor: 30,
-      hungerFactor: 1.0
-    }
+      staminaFactor: 300.0,  // Adjusted
+      hungerFactor: 1.0,
+      migrationFactor: 0.5   // New parameter
+      }
   };
 
   const addLog = (message) => {
@@ -49,10 +54,10 @@ const DebugInterface = () => {
     }]);
   };
 
-  const exportToCsv = (data) => {
+  const exportToCsv = () => {
     const csvContent = "data:text/csv;charset=utf-8," + 
-      "Year,Trees,Deer,Wolves,TreeAvgAge,DeerAvgAge,WolfAvgAge,TreeDeaths,DeerDeaths,WolfDeaths\n" +
-      data.map(row => {
+      "Year,Trees,Deer,Wolves,TreeAvgAge,DeerAvgAge,WolfAvgAge,TreeDeaths,DeerDeaths,WolfDeaths,YoungTrees\n" +
+      simulationData.map(row => {
         return [
           row.year,
           row.trees,
@@ -63,7 +68,8 @@ const DebugInterface = () => {
           row.wolfAvgAge?.toFixed(2) || 0,
           row.treeDeaths || 0,
           row.deerDeaths || 0,
-          row.wolfDeaths || 0
+          row.wolfDeaths || 0,
+          row.youngTrees || 0
         ].join(",");
       }).join("\n");
     
@@ -76,9 +82,9 @@ const DebugInterface = () => {
     document.body.removeChild(link);
   };
 
-  const exportLogs = (logs) => {
+  const exportLogs = () => {
     const logContent = "data:text/plain;charset=utf-8," + 
-      logs.map(log => `[${log.time}] ${log.message}`).join('\n');
+      debugLogs.map(log => `[${log.time}] ${log.message}`).join('\n');
     
     const encodedUri = encodeURI(logContent);
     const link = document.createElement("a");
@@ -94,6 +100,31 @@ const DebugInterface = () => {
     setDebugOutput([]);
     setSimulationData([]);
     setDebugLogs([]);
+    
+    // Intercept console logs to capture in our debug logs
+    console.log = (...args) => {
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg) : arg
+      ).join(' ');
+      addLog(message);
+      consoleLogRef.current(...args);
+    };
+    
+    console.warn = (...args) => {
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg) : arg
+      ).join(' ');
+      addLog(`WARNING: ${message}`);
+      consoleWarnRef.current(...args);
+    };
+    
+    console.error = (...args) => {
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg) : arg
+      ).join(' ');
+      addLog(`ERROR: ${message}`);
+      consoleErrorRef.current(...args);
+    };
     
     const simulation = new SimulationManager(config, 'normal');
     const debugData = [];
@@ -117,7 +148,8 @@ const DebugInterface = () => {
           trees: stats.trees.total,
           deer: 0,
           wolves: 0,
-          treeAvgAge: stats.trees.averageAge
+          treeAvgAge: stats.trees.averageAge,
+          youngTrees: stats.trees.youngTrees || 0
         });
         
         setSimulationData([...debugData]);
@@ -140,7 +172,8 @@ const DebugInterface = () => {
           wolfAvgAge: yearStats.wolves.averageAge,
           treeDeaths: yearStats.trees.deaths || 0,
           deerDeaths: yearStats.deer.deaths || 0,
-          wolfDeaths: yearStats.wolves.deaths || 0
+          wolfDeaths: yearStats.wolves.deaths || 0,
+          youngTrees: yearStats.trees.youngTrees || 0
         };
         
         debugData.push(yearData);
@@ -158,14 +191,15 @@ const DebugInterface = () => {
       }
       
       setDebugOutput(debugData);
-      exportToCsv(debugData);
-      exportLogs(debugLogs);
       
     } catch (error) {
       addLog('Simulation Error: ' + error.message);
       console.error('Simulation Error:', error);
-      exportLogs(debugLogs);
     } finally {
+      // Restore original console methods
+      console.log = consoleLogRef.current;
+      console.warn = consoleWarnRef.current;
+      console.error = consoleErrorRef.current;
       setIsRunning(false);
     }
   };
@@ -223,52 +257,81 @@ const DebugInterface = () => {
       
       {(debugOutput.length > 0 || simulationData.length > 0) && (
         <div className="mt-8 space-y-6">
+          {/* TREE POPULATION GRAPH */}
           <div>
-            <h2 className="text-xl font-semibold mb-4">Population Graph</h2>
-            <div className="h-96">
-              <LineChart
-                width={800}
-                height={300}
-                data={simulationData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="trees" stroke="#2ecc71" name="Trees" dot={false} />
-                <Line type="monotone" dataKey="deer" stroke="#e67e22" name="Deer" dot={false} />
-                <Line type="monotone" dataKey="wolves" stroke="#7f8c8d" name="Wolves" dot={false} />
-              </LineChart>
+            <h2 className="text-xl font-semibold mb-2 text-green-700">Tree Population</h2>
+            <div className="h-64 border rounded p-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={simulationData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="trees" stroke="#2ecc71" name="Trees" dot={false} />
+                  <Line type="monotone" dataKey="youngTrees" stroke="#27ae60" name="Young Trees" strokeDasharray="3 3" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
+          {/* DEER POPULATION GRAPH */}
           <div>
-            <h2 className="text-xl font-semibold mb-4">Debug Logs</h2>
-            <div className="bg-gray-50 p-4 rounded h-96 overflow-auto font-mono text-sm">
-              {debugLogs.map((log, index) => (
-                <div key={index} className="mb-1">
-                  [{log.time.split('T')[1].split('.')[0]}] {log.message}
-                </div>
-              ))}
+            <h2 className="text-xl font-semibold mb-2 text-orange-700">Deer Population</h2>
+            <div className="h-64 border rounded p-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={simulationData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="deer" stroke="#e67e22" name="Deer" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
+          </div>
+
+          {/* WOLF POPULATION GRAPH */}
+          <div>
+            <h2 className="text-xl font-semibold mb-2 text-gray-700">Wolf Population</h2>
+            <div className="h-64 border rounded p-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={simulationData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="wolves" stroke="#7f8c8d" name="Wolves" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Download buttons */}
+          <div className="flex space-x-4">
             <button
-              onClick={() => exportLogs(debugLogs)}
-              className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              onClick={exportToCsv}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
             >
-              Download Logs
+              Download CSV Data
             </button>
-          </div>
-
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Raw Data</h2>
-            <p className="mb-4">CSV file has been downloaded with detailed results.</p>
-            <div className="bg-gray-50 p-4 rounded overflow-auto">
-              <pre className="text-sm">
-                {JSON.stringify(debugOutput, null, 2)}
-              </pre>
-            </div>
+            <button
+              onClick={exportLogs}
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            >
+              Download Log File
+            </button>
           </div>
         </div>
       )}

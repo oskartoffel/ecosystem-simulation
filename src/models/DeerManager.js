@@ -157,15 +157,16 @@ class DeerManager {
 
     // Validate that trees are proper Tree instances
     findYoungTree(trees) {
-        const randomIndex = Math.floor(Math.random() * trees.length);
-        const tree = trees[randomIndex];
+        // First check if any young trees exist to avoid wasting attempts
+        const youngTrees = trees.filter(tree => tree instanceof Tree && tree.position !== 0 && tree.age <= 2);
         
-        // Simple validation, no logging
-        if (tree instanceof Tree && tree.position !== 0 && tree.age <= 2) {
-            return tree;
+        if (youngTrees.length === 0) {
+            return null; // No young trees available
         }
         
-        return null;
+        // Select a random young tree directly from the filtered list
+        const randomIndex = Math.floor(Math.random() * youngTrees.length);
+        return youngTrees[randomIndex];
     }
     
 
@@ -244,6 +245,46 @@ class DeerManager {
             distribution[deer.age] = (distribution[deer.age] || 0) + 1;
         });
         return distribution;
+    }
+
+    processMigration(migrationFactor) {
+        // Skip if factor is zero
+        if (migrationFactor <= 0) return;
+        
+        // The base number of migrating deer (can be adjusted with migrationFactor)
+        const baseMigrants = 1 + Math.floor(Math.random() * 2); // 1-2 deer by default
+        
+        // Final number of migrants adjusted by the factor (higher factor = more migration)
+        const migrantCount = Math.max(0, Math.round(baseMigrants * migrationFactor));
+        
+        if (migrantCount > 0) {
+            console.log(`DeerManager: ${migrantCount} deer migrating into the ecosystem`);
+            
+            let successfulMigrants = 0;
+            for (let i = 0; i < migrantCount; i++) {
+                let newPos = this.findEmptyPosition();
+                if (newPos === -1) {
+                    console.warn("DeerManager: No space available for migrating deer");
+                    break;
+                }
+                
+                // Create a mature deer with reasonable stats
+                const age = Utils.randGauss(4, 1);  // Young adult deer
+                const tempDeer = new Deer(newPos + 1, age, 0, 0, 0);
+                
+                // Calculate properties based on age
+                tempDeer.mass = age > 4 ? 28 : age * 7;
+                tempDeer.hunger = age > 4 ? 2.0 : (age * 2.0 / 4.0);
+                tempDeer.stamina = this.calculateStamina(age, 10000.0); // Fixed stamina factor for migrants
+                
+                this.deers[newPos] = tempDeer;
+                successfulMigrants++;
+            }
+            
+            if (successfulMigrants > 0) {
+                console.log(`DeerManager: ${successfulMigrants} deer successfully migrated into the ecosystem`);
+            }
+        }
     }
 
     // Debug method to show deer details

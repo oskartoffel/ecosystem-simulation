@@ -1,0 +1,72 @@
+BASIC
+
+# Install dependencies (first time only)
+npm install
+
+# Start development server
+npm start
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
+
+# Run on local server
+npm run dev
+
+GITHUB
+
+# Initialize a new repo (if not already done)
+git init
+
+# Add all files to staging
+git add .
+
+# Commit your changes
+git commit -m "Your commit message"
+
+# Connect to your GitHub repository (first time only)
+git remote add origin https://github.com/oskartoffel/ecosystem-simulation.git
+
+# Push changes to GitHub
+git push -u origin main   # or 'master' depending on your branch name
+
+GitHub Pages Deployment
+
+# Install GitHub Pages package (first time only)
+npm install --save gh-pages
+
+# Add these to package.json scripts (one-time setup)
+# "predeploy": "npm run build",
+# "deploy": "gh-pages -d build"
+
+# Deploy to GitHub Pages
+npm run deploy
+
+Update Your Existing Website
+
+# After making changes:
+git add .
+git commit -m "Update description here"
+git push
+
+# Then deploy the updated site
+npm run deploy
+
+Useful GitHub Commands
+
+# Check status of your files
+git status
+
+# Create and switch to a new branch
+git checkout -b new-feature-name
+
+# Switch between branches
+git checkout main
+
+# Pull latest changes
+git pull
+
+# See commit history
+git log --oneline

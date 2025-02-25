@@ -229,6 +229,48 @@ class WolfManager {
         return Math.ceil(aliveWolves.length / 8);
     }
 
+    
+    // Process random migration of wolves into the ecosystem
+    processMigration(migrationFactor) {
+        // Skip if factor is zero
+        if (migrationFactor <= 0) return;
+        
+        // Base migration rate lower than deer (predators are typically less abundant)
+        const baseMigrants = Math.random() < 0.7 ? 1 : 0; // 70% chance of 1 wolf, 30% chance of none
+        
+        // Final number of migrants adjusted by the factor
+        const migrantCount = Math.max(0, Math.round(baseMigrants * migrationFactor));
+        
+        if (migrantCount > 0) {
+            console.log(`WolfManager: ${migrantCount} wolves migrating into the ecosystem`);
+            
+            let successfulMigrants = 0;
+            for (let i = 0; i < migrantCount; i++) {
+                let newPos = this.findEmptyPosition();
+                if (newPos === -1) {
+                    console.warn("WolfManager: No space available for migrating wolves");
+                    break;
+                }
+                
+                // Create a mature wolf with reasonable stats
+                const age = Utils.randGauss(3, 1);  // Young adult wolf
+                const tempWolf = new Wolf(newPos + 1, age, 0, 0, 0);
+                
+                // Calculate properties based on age
+                tempWolf.mass = age > 4 ? 28 : age * 7;
+                tempWolf.hunger = age > 4 ? 1.0 : (age * 1.0 / 4.0);
+                tempWolf.stamina = this.calculateStamina(age, 300.0); // Fixed stamina factor for migrants
+                
+                this.wolves[newPos] = tempWolf;
+                successfulMigrants++;
+            }
+            
+            if (successfulMigrants > 0) {
+                console.log(`WolfManager: ${successfulMigrants} wolves successfully migrated into the ecosystem`);
+            }
+        }
+    }
+
     // Debug method to show wolf details
     debugWolf(index) {
         const wolf = this.wolves[index];

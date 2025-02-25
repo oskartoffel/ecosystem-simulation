@@ -163,6 +163,17 @@ class SimulationManager {
             this.treeManager.reproduce(this.config.tree.maturity);
             
             // Deer lifecycle
+            // Process deer migration first - add new individuals if population is low
+            const deerPopulation = this.deerManager.getPopulationCount();
+            if (deerPopulation < 10) {  // Apply migration if population is low
+                this.deerManager.processMigration(this.config.deer.migrationFactor);
+            } else {
+                // Still allow some migration, but with lower probability for healthy populations
+                if (Math.random() < 0.2) {  // 20% chance of migration even for healthy populations
+                    this.deerManager.processMigration(this.config.deer.migrationFactor * 0.5);  // Reduce factor
+                }
+            }
+            
             this.deerManager.reproduce(this.config.deer.maturity);
             this.deerManager.grow(
                 this.config.deer.staminaFactor,
@@ -172,6 +183,17 @@ class SimulationManager {
             this.deerManager.processFeeding(this.treeManager.trees);
             
             // Wolf lifecycle
+            // Process wolf migration first - add new individuals if population is low
+            const wolfPopulation = this.wolfManager.getPopulationCount();
+            if (wolfPopulation < 3) {  // Apply migration if population is low
+                this.wolfManager.processMigration(this.config.wolf.migrationFactor);
+            } else {
+                // Still allow some migration, but with lower probability for healthy populations
+                if (Math.random() < 0.1) {  // 10% chance of migration even for healthy populations
+                    this.wolfManager.processMigration(this.config.wolf.migrationFactor * 0.3);  // Reduce factor more
+                }
+            }
+            
             this.wolfManager.reproduce(this.config.wolf.maturity);
             this.wolfManager.grow(
                 this.config.wolf.staminaFactor,
