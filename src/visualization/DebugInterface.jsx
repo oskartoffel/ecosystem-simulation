@@ -1,8 +1,10 @@
-// DebugInterface.jsx
-import React, { useState, useRef } from 'react';
+// DebugInterface.jsx - With parameter management functionality
+import React, { useState, useRef, useEffect } from 'react';
 import { SimulationManager } from '../simulation/SimulationManager';
 import EcosystemVisualization from './EcosystemVisualization';
 import ParameterControls from './ParameterControls';
+import ParameterSaveDialog from './ParameterSaveDialog';
+import ParameterManager from '../utils/ParameterManager';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const DebugInterface = () => {
@@ -12,13 +14,22 @@ const DebugInterface = () => {
   const [currentYear, setCurrentYear] = useState(0);
   const [simulationData, setSimulationData] = useState([]);
   const [debugLogs, setDebugLogs] = useState([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [tempConfig, setTempConfig] = useState(null);
+  
   const consoleLogRef = useRef(console.log);
   const consoleWarnRef = useRef(console.warn);
   const consoleErrorRef = useRef(console.error);
 
+  // Load saved parameters or use defaults
+  const loadInitialConfig = () => {
+    const savedParams = ParameterManager.loadParameters();
+    return savedParams || defaultConfig;
+  };
+
   const defaultConfig = {
     gridSize: 10000,
-    years: 20,  // or appropriate value
+    years: 20,
     stabilizationYears: 10,
     tree: {
       initial: 1000,
@@ -27,25 +38,36 @@ const DebugInterface = () => {
       ageAvg: 30,
       ageSigma: 20,
       maturity: 10,
-      stressIndex: 85  // Slightly lower than 90 to allow more young trees
+      stressIndex: 85
     },
     deer: {
       initial: 20,
-      arraySize: 500,  // Increased from 200
+      arraySize: 500,
       maturity: 2,
-      staminaFactor: 10000.0,  // Reduced from 100000.0
-      hungerFactor: 5.0,       // Increased from 2.0
-      migrationFactor: 1.0     // New parameter
+      staminaFactor: 10000.0,
+      hungerFactor: 5.0,
+      migrationFactor: 1.0
     },
     wolf: {
       initial: 5,
-      arraySize: 200,  // Increased from 100
+      arraySize: 200,
       maturity: 2,
-      staminaFactor: 300.0,  // Adjusted
+      staminaFactor: 300.0,
       hungerFactor: 1.0,
-      migrationFactor: 0.5   // New parameter
-      }
+      migrationFactor: 0.5
+    }
   };
+
+  // State for config
+  const [config, setConfig] = useState(loadInitialConfig());
+
+  // Effect to load saved parameters on component mount
+  useEffect(() => {
+    const savedParams = ParameterManager.loadParameters();
+    if (savedParams) {
+      setConfig(savedParams);
+    }
+  }, []);
 
   const addLog = (message) => {
     setDebugLogs(prev => [...prev, {
@@ -57,21 +79,23 @@ const DebugInterface = () => {
   const exportToCsv = () => {
     const csvContent = "data:text/csv;charset=utf-8," + 
       "Year,Trees,Deer,Wolves,TreeAvgAge,DeerAvgAge,WolfAvgAge,TreeDeaths,DeerDeaths,WolfDeaths,YoungTrees\n" +
-      simulationData.map(row => {
-        return [
-          row.year,
-          row.trees,
-          row.deer,
-          row.wolves,
-          row.treeAvgAge?.toFixed(2) || 0,
-          row.deerAvgAge?.toFixed(2) || 0,
-          row.wolfAvgAge?.toFixed(2) || 0,
-          row.treeDeaths || 0,
-          row.deerDeaths || 0,
-          row.wolfDeaths || 0,
-          row.youngTrees || 0
-        ].join(",");
-      }).join("\n");
+      simulationData
+        .filter(row => row.phase !== 'stabilization') // Filter out stabilization years
+        .map(row => {
+          return [
+            row.year,
+            row.trees,
+            row.deer,
+            row.wolves,
+            row.treeAvgAge?.toFixed(2) || 0,
+            row.deerAvgAge?.toFixed(2) || 0,
+            row.wolfAvgAge?.toFixed(2) || 0,
+            row.treeDeaths || 0,
+            row.deerDeaths || 0,
+            row.wolfDeaths || 0,
+            row.youngTrees || 0
+          ].join(",");
+        }).join("\n");
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -95,11 +119,47 @@ const DebugInterface = () => {
     document.body.removeChild(link);
   };
 
-  const runDebugSimulation = async (config) => {
+  // Function for chart dot rendering - only show dot for current year
+  const renderDot = (props) => {
+    const { cx, cy, payload } = props;
+    if (payload.currentYear) {
+      return (
+        <circle cx={cx} cy={cy} r={4} fill="#000" stroke="none" />
+      );
+    }
+    return null;
+  };
+
+  // Dialog handlers
+  const handleSaveParameters = () => {
+    if (tempConfig) {
+      ParameterManager.saveParameters(tempConfig);
+      setConfig(tempConfig); // Update current config
+    }
+    setIsDialogOpen(false);
+  };
+
+  const handleDownloadParameters = () => {
+    if (tempConfig) {
+      ParameterManager.downloadParametersJS(tempConfig);
+    }
+    setIsDialogOpen(false);
+  };
+
+  const handleDiscardParameters = () => {
+    setTempConfig(null);
+    setIsDialogOpen(false);
+  };
+
+  const runDebugSimulation = async (simulationConfig) => {
     setIsRunning(true);
     setDebugOutput([]);
     setSimulationData([]);
     setDebugLogs([]);
+    
+    // Store config for potential saving later
+    setTempConfig({...simulationConfig});
+    setConfig(simulationConfig); // Use the new config for this run
     
     // Intercept console logs to capture in our debug logs
     console.log = (...args) => {
@@ -126,42 +186,51 @@ const DebugInterface = () => {
       consoleErrorRef.current(...args);
     };
     
-    const simulation = new SimulationManager(config, 'normal');
+    const simulation = new SimulationManager(simulationConfig, 'normal');
     const debugData = [];
     
-    addLog('Starting simulation with config: ' + JSON.stringify(config, null, 2));
+    addLog('Starting simulation with config: ' + JSON.stringify(simulationConfig, null, 2));
     
     try {
       simulation.initialize();
       addLog('Initialization complete');
       
-      // Run stabilization period
-      for (let i = 0; i < config.stabilizationYears; i++) {
+      // Run stabilization period (don't add to graph data anymore)
+      for (let i = 0; i < simulationConfig.stabilizationYears; i++) {
         const stats = simulation.getCurrentStats();
         if (i % 10 === 0) {
           addLog(`Stabilization Year ${i}: Trees=${stats.trees.total} (Avg Age: ${stats.trees.averageAge.toFixed(1)})`);
         }
         
-        debugData.push({
-          year: -config.stabilizationYears + i,
-          phase: 'stabilization',
-          trees: stats.trees.total,
-          deer: 0,
-          wolves: 0,
-          treeAvgAge: stats.trees.averageAge,
-          youngTrees: stats.trees.youngTrees || 0
-        });
-        
-        setSimulationData([...debugData]);
+        // We no longer add stabilization data to the graph
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       
+      // Create empty data points for all years to set the domain properly
+      for (let year = 0; year < simulationConfig.years; year++) {
+        debugData.push({
+          year,
+          phase: 'simulation',
+          trees: null,
+          deer: null,
+          wolves: null,
+          treeAvgAge: null,
+          deerAvgAge: null,
+          wolfAvgAge: null,
+          treeDeaths: null,
+          deerDeaths: null,
+          wolfDeaths: null,
+          youngTrees: null
+        });
+      }
+      setSimulationData([...debugData]);
+      
       // Main simulation
-      for (let year = 0; year < config.years; year++) {
+      for (let year = 0; year < simulationConfig.years; year++) {
         setCurrentYear(year);
         const yearStats = simulation.simulateYear();
         
-        const yearData = {
+        debugData[year] = {
           year,
           phase: 'simulation',
           trees: yearStats.trees.total,
@@ -173,10 +242,15 @@ const DebugInterface = () => {
           treeDeaths: yearStats.trees.deaths || 0,
           deerDeaths: yearStats.deer.deaths || 0,
           wolfDeaths: yearStats.wolves.deaths || 0,
-          youngTrees: yearStats.trees.youngTrees || 0
+          youngTrees: yearStats.trees.youngTrees || 0,
+          currentYear: true // Mark the current year for visualization
         };
         
-        debugData.push(yearData);
+        // Remove currentYear marker from previous years
+        if (year > 0) {
+          debugData[year - 1].currentYear = false;
+        }
+        
         setSimulationData([...debugData]);
         
         if (year % 5 === 0) {
@@ -201,6 +275,9 @@ const DebugInterface = () => {
       console.warn = consoleWarnRef.current;
       console.error = consoleErrorRef.current;
       setIsRunning(false);
+      
+      // Open the parameter save dialog
+      setIsDialogOpen(true);
     }
   };
 
@@ -245,7 +322,7 @@ const DebugInterface = () => {
       <h1 className="text-2xl font-bold mb-8">Debug Mode</h1>
       
       <ParameterControls
-        defaultConfig={defaultConfig}
+        defaultConfig={config}
         onStart={runDebugSimulation}
       />
       
@@ -257,66 +334,138 @@ const DebugInterface = () => {
       
       {(debugOutput.length > 0 || simulationData.length > 0) && (
         <div className="mt-8 space-y-6">
-          {/* TREE POPULATION GRAPH */}
-          <div>
-            <h2 className="text-xl font-semibold mb-2 text-green-700">Tree Population</h2>
-            <div className="h-64 border rounded p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={simulationData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="trees" stroke="#2ecc71" name="Trees" dot={false} />
-                  <Line type="monotone" dataKey="youngTrees" stroke="#27ae60" name="Young Trees" strokeDasharray="3 3" dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* TREE POPULATION GRAPH */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h2 className="text-lg font-semibold mb-2 text-green-700">Tree Population</h2>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={simulationData}
+                    margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="year" 
+                      domain={[0, config.years - 1]} 
+                      type="number"
+                      allowDataOverflow={true}
+                    />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="trees" 
+                      stroke="#2ecc71" 
+                      name="Trees" 
+                      connectNulls={true} 
+                      dot={renderDot}
+                      isAnimationActive={false}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="youngTrees" 
+                      stroke="#27ae60" 
+                      name="Young Trees" 
+                      strokeDasharray="3 3" 
+                      connectNulls={true}
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* DEER POPULATION GRAPH */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h2 className="text-lg font-semibold mb-2 text-orange-700">Deer Population</h2>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={simulationData}
+                    margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="year" 
+                      domain={[0, config.years - 1]} 
+                      type="number"
+                      allowDataOverflow={true}
+                    />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="deer" 
+                      stroke="#e67e22" 
+                      name="Deer" 
+                      connectNulls={true} 
+                      dot={renderDot}
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* WOLF POPULATION GRAPH */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h2 className="text-lg font-semibold mb-2 text-gray-700">Wolf Population</h2>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={simulationData}
+                    margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="year" 
+                      domain={[0, config.years - 1]} 
+                      type="number"
+                      allowDataOverflow={true}
+                    />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="wolves" 
+                      stroke="#7f8c8d" 
+                      name="Wolves" 
+                      connectNulls={true} 
+                      dot={renderDot}
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
-          {/* DEER POPULATION GRAPH */}
-          <div>
-            <h2 className="text-xl font-semibold mb-2 text-orange-700">Deer Population</h2>
-            <div className="h-64 border rounded p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={simulationData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="deer" stroke="#e67e22" name="Deer" dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+          {/* Current stats cards */}
+          {simulationData.length > 0 && simulationData[currentYear]?.trees !== null && (
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h3 className="font-bold text-green-800">Trees</h3>
+                <p>Total: {simulationData[currentYear].trees}</p>
+                <p>Young: {simulationData[currentYear].youngTrees || 0}</p>
+                <p>Avg Age: {simulationData[currentYear].treeAvgAge?.toFixed(1) || 0}</p>
+              </div>
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <h3 className="font-bold text-orange-800">Deer</h3>
+                <p>Population: {simulationData[currentYear].deer}</p>
+                <p>Avg Age: {simulationData[currentYear].deerAvgAge?.toFixed(1) || 0}</p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-bold text-gray-800">Wolves</h3>
+                <p>Population: {simulationData[currentYear].wolves}</p>
+                <p>Avg Age: {simulationData[currentYear].wolfAvgAge?.toFixed(1) || 0}</p>
+              </div>
             </div>
-          </div>
-
-          {/* WOLF POPULATION GRAPH */}
-          <div>
-            <h2 className="text-xl font-semibold mb-2 text-gray-700">Wolf Population</h2>
-            <div className="h-64 border rounded p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={simulationData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="wolves" stroke="#7f8c8d" name="Wolves" dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          )}
 
           {/* Download buttons */}
           <div className="flex space-x-4">
@@ -332,9 +481,24 @@ const DebugInterface = () => {
             >
               Download Log File
             </button>
+            <button
+              onClick={() => ParameterManager.downloadParametersJS(config)}
+              className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+            >
+              Download Current Parameters
+            </button>
           </div>
         </div>
       )}
+
+      {/* Parameter Save Dialog */}
+      <ParameterSaveDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        onSave={handleSaveParameters}
+        onDownload={handleDownloadParameters}
+        onDiscard={handleDiscardParameters}
+      />
     </div>
   );
 };

@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import ParameterManager from '../utils/ParameterManager';
 
 const ParameterControls = ({ defaultConfig, onStart }) => {
   const [config, setConfig] = useState(defaultConfig);
   const [isConfiguring, setIsConfiguring] = useState(true);
+
+  // Update when defaultConfig changes (e.g. when saved parameters are loaded)
+  useEffect(() => {
+    setConfig(defaultConfig);
+  }, [defaultConfig]);
 
   const handleChange = (category, parameter, value) => {
     if (category === 'general') {
@@ -24,6 +30,15 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
   const handleSubmit = () => {
     setIsConfiguring(false);
     onStart(config);
+  };
+
+  const handleReset = () => {
+    // Reset to defaultConfig
+    setConfig(defaultConfig);
+  };
+
+  const handleDownloadParameters = () => {
+    ParameterManager.downloadParametersJS(config);
   };
 
   if (!isConfiguring) return null;
@@ -174,7 +189,7 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
                 type="number"
                 step="0.1"
                 min="0"
-                value={config.deer.migrationFactor}
+                value={config.deer.migrationFactor || 1.0}
                 onChange={(e) => handleChange('deer', 'migrationFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
@@ -237,7 +252,7 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
               type="number"
               step="0.1"
               min="0"
-              value={config.wolf.migrationFactor}
+              value={config.wolf.migrationFactor || 0.5}
               onChange={(e) => handleChange('wolf', 'migrationFactor', e.target.value)}
               className="w-full mt-1 px-2 py-1 border rounded"
             />
@@ -255,7 +270,19 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
         </div>
       </div>
 
-      <div className="mt-6 flex justify-end">
+      <div className="mt-6 flex justify-end space-x-3">
+        <button
+          onClick={handleReset}
+          className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+        >
+          Reset to Defaults
+        </button>
+        <button
+          onClick={handleDownloadParameters}
+          className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+        >
+          Download Parameters
+        </button>
         <button
           onClick={handleSubmit}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
