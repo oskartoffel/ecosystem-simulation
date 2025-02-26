@@ -28,7 +28,7 @@ export const SimulationParameters = {
             number: 20,
             populationSize: 100
         },
-        staminaFactor: 100000.0,
+        staminaFactor: 5.0,
         hungerFactor: 5.0,
         maturity: 3,
         reproductionFactor: 1.0,  // NEW: Controls deer reproduction rate (1.0 = normal)
@@ -41,7 +41,7 @@ export const SimulationParameters = {
             number: 5,
             populationSize: 100
         },
-        staminaFactor: 1.0,
+        staminaFactor: 5.0,
         hungerFactor: 1.0,
         maturity: 2,
         reproductionFactor: 1.0,  // NEW: Controls wolf reproduction rate (1.0 = normal)

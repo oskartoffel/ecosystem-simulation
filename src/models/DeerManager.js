@@ -52,9 +52,14 @@ class DeerManager {
 
     // Helper method to calculate stamina
     calculateStamina(age, staminaFactor) {
-        return staminaFactor * (13.26 * Math.exp(
-            -Math.pow(age - 4.51, 2) / (2 * 3.28 * 3.28)
-        ));
+        // New method using a 0-10 scale directly
+        // staminaFactor is now a direct multiplier from the UI (also 0-10)
+        
+        // Base curve that peaks at age 4-5
+        const baseCurve = Math.max(0, 10 - Math.pow(age - 4.5, 2) / 3);
+        
+        // Apply the staminaFactor as a direct multiplier
+        return Math.min(10, baseCurve * (staminaFactor / 5));
     }
 
     // Find empty position for new deer
@@ -177,47 +182,116 @@ class DeerManager {
         return tree instanceof Tree && tree.position !== 0 && tree.age <= maxEdibleAge;
     }
 
+    calculateForagingSuccess(deer, availableTreeCount, initialTreeCount) {
+        // No trees means no chance of finding food
+        if (availableTreeCount === 0) return 0;
+        
+        // Base probability depends on food availability
+        const availabilityFactor = availableTreeCount / Math.max(1, initialTreeCount);
+        
+        // Use stamina directly (assuming 0-10 scale from control panel)
+        const staminaFactor = deer.stamina / 10;
+        
+        // Age factor - prime-age deer have advantage
+        const ageFactor = 1.0 - Math.abs(deer.age - 4) / 10; // Peak at age 4
+        
+        // Combined probability - this represents the deer's ability to find food
+        // NOT whether it finds enough food (that's determined by hunger vs. what it finds)
+        let probability = 
+            (0.3 + 0.4 * availabilityFactor) * // Base chance + availability impact
+            (0.7 + 0.3 * staminaFactor) *      // Stamina boost
+            (0.8 + 0.2 * ageFactor);           // Age modifier
+        
+        // Cap probability between 0 and 1
+        return Math.max(0, Math.min(1, probability));
+    }
+
     // Handle deer eating trees
     processFeeding(trees, edibleAge = 2) {
-        // Just log the initial count once
-        const edibleTrees = trees.filter(tree => tree && tree.position !== 0 && tree.age <= edibleAge).length;
-        console.log(`DeerManager: Starting feeding cycle. Available edible trees (age <= ${edibleAge}): ${edibleTrees}`);
-    
-        this.deers.forEach((deer, deerIndex) => {
-            if (!deer.isAlive()) return;
-    
-            let consumed = 0;
-            let attempts = 0;
-            let successfulFinds = 0;
+        // First, identify all edible trees
+        const edibleTrees = trees.filter(tree => 
+            tree instanceof Tree && tree.position !== 0 && tree.age <= edibleAge);
+        
+        const totalEdibleMass = edibleTrees.reduce((sum, tree) => sum + tree.mass, 0);
+        const initialEdibleCount = edibleTrees.length;
+        
+        console.log(`DeerManager: Starting feeding cycle. Available edible trees (age <= ${edibleAge}): ${initialEdibleCount}, mass: ${totalEdibleMass.toFixed(1)}`);
+        
+        // Create a copy of edible trees to track which ones remain available
+        let availableTrees = [...edibleTrees];
+        
+        // Sort deer by stamina so stronger deer feed first (natural competition)
+        const sortedDeerIndices = this.deers
+            .map((deer, index) => ({ deer, index }))
+            .filter(item => item.deer.isAlive())
+            .sort((a, b) => b.deer.stamina - a.deer.stamina)
+            .map(item => item.index);
+        
+        for (const deerIndex of sortedDeerIndices) {
+            const deer = this.deers[deerIndex];
             
-            while (attempts < deer.stamina && !this.isSatisfied(consumed, deer.hunger)) {
-                const edibleTree = this.findYoungTree(trees, edibleAge);
-                if (edibleTree) {
-                    consumed += edibleTree.mass;
-                    const treeIndex = trees.indexOf(edibleTree);
-                    if (treeIndex !== -1) {
-                        trees[treeIndex] = new Tree(0, 0, 0, 0, 0);
-                        successfulFinds++;
-                    }
-                }
-                attempts++;
+            // No trees left means no chance of survival
+            if (availableTrees.length === 0) {
+                console.log(`DeerManager: Deer ${deerIndex} died: No edible trees remain`);
+                this.killDeer(deerIndex);
+                continue;
+            }
+            
+            // Calculate how many trees this deer needs based on hunger
+            const avgTreeMass = availableTrees.reduce((sum, t) => sum + t.mass, 0) / availableTrees.length;
+            const treesNeededForHunger = Math.ceil(deer.hunger / avgTreeMass);
+            
+            // Calculate foraging success - this is the deer's ability to find trees, NOT considering hunger
+            const foragingSuccess = this.calculateForagingSuccess(
+                deer,
+                availableTrees.length,
+                initialEdibleCount
+            );
+            
+            // Calculate how many trees the deer actually finds
+            // This is a probabilistic result between 0 and what it needs
+            const successRate = Math.random() * foragingSuccess;
+            const treesFound = Math.floor(treesNeededForHunger * successRate);
+            
+            // Actual trees consumed is limited by what's available
+            const treesConsumed = Math.min(
+                treesFound,
+                Math.floor(availableTrees.length * 0.1), // Cap at 10% of available trees
+                availableTrees.length // Can't eat more trees than available
+            );
+            
+            // Calculate if deer found enough food
+            const massNeeded = deer.hunger;
+            let massConsumed = 0;
+            
+            // Remove consumed trees from environment
+            for (let i = 0; i < treesConsumed && availableTrees.length > 0; i++) {
+                // Take a random tree from the available pool
+                const randomIndex = Math.floor(Math.random() * availableTrees.length);
+                const consumedTree = availableTrees[randomIndex];
                 
-                // Only log every 100,000 attempts if still searching
-                if (attempts % 100000 === 0) {
-                    console.log(`DeerManager: Deer ${deerIndex} still searching - Found ${successfulFinds} trees in ${attempts} attempts`);
+                // Remove from available pool
+                availableTrees.splice(randomIndex, 1);
+                
+                // Remove from main tree array (mark as consumed)
+                const treeIndex = trees.indexOf(consumedTree);
+                if (treeIndex !== -1) {
+                    trees[treeIndex] = new Tree(0, 0, 0, 0, 0);
+                    massConsumed += consumedTree.mass;
                 }
             }
-    
-            // Only log the final outcome
-            if (!this.isSatisfied(consumed, deer.hunger)) {
-                console.log(`DeerManager: Deer ${deerIndex} died: found ${successfulFinds} trees, consumed ${consumed.toFixed(1)}/${deer.hunger} (${attempts} attempts)`);
+            
+            // Determine if deer survives based on how much it ate compared to what it needed
+            if (massConsumed >= massNeeded) {
+                console.log(`DeerManager: Deer ${deerIndex} survived: ate ${treesConsumed} trees (${massConsumed.toFixed(1)}/${massNeeded.toFixed(1)} mass)`);
+            } else {
+                console.log(`DeerManager: Deer ${deerIndex} died: found only ${massConsumed.toFixed(1)}/${massNeeded.toFixed(1)} mass needed`);
                 this.killDeer(deerIndex);
             }
-        });
-    
-        // Log summary at end of feeding cycle
+        }
+        
         const survivingDeer = this.deers.filter(deer => deer.isAlive()).length;
-        console.log(`DeerManager: Feeding cycle complete. ${survivingDeer} deer survived`);
+        console.log(`DeerManager: Feeding cycle complete. ${survivingDeer}/${sortedDeerIndices.length} deer survived`);
     }
     
 

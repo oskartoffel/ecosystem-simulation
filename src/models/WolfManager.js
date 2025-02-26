@@ -53,9 +53,13 @@ class WolfManager {
 
     // Helper method to calculate stamina
     calculateStamina(age, staminaFactor) {
-        return staminaFactor * (13.26 * Math.exp(
-            -Math.pow(age - 4.51, 2) / (2 * 3.28 * 3.28)
-        ));
+        // New method using a 0-10 scale directly
+        
+        // Base curve that peaks at age 4-5
+        const baseCurve = Math.max(0, 10 - Math.pow(age - 4.5, 2) / 2.5);
+        
+        // Apply the staminaFactor as a direct multiplier
+        return Math.min(10, baseCurve * (staminaFactor / 5));
     }
 
     // Find empty position for new wolf
@@ -156,35 +160,120 @@ class WolfManager {
         });
     }
 
+    calculateHuntingSuccess(wolf, availableDeerCount, initialDeerCount) {
+        // No deer means no chance of finding food
+        if (availableDeerCount === 0) return 0;
+        
+        // Base probability depends on prey availability
+        const availabilityFactor = availableDeerCount / Math.max(1, initialDeerCount);
+        
+        // Use stamina directly (assuming 0-10 scale from control panel)
+        const staminaFactor = wolf.stamina / 10;
+        
+        // Age factor - prime-age wolves have advantage
+        const ageFactor = 1.0 - Math.abs(wolf.age - 4) / 8; // Peak at age 4
+        
+        // Pack dynamics - wolves hunt better in packs
+        const wolfCount = this.wolves.filter(w => w.isAlive()).length;
+        const packFactor = Math.min(1.5, 0.7 + (wolfCount / 10)); // Max 50% bonus for large packs
+        
+        // Combined probability - this represents the wolf's ability to find prey
+        // NOT whether it finds enough food (that's determined by hunger vs. what it catches)
+        let probability = 
+            (0.2 + 0.4 * availabilityFactor) * // Base chance + availability impact
+            (0.6 + 0.4 * staminaFactor) *      // Stamina boost
+            (0.7 + 0.3 * ageFactor) *          // Age modifier
+            packFactor;                         // Pack bonus
+        
+        // Cap probability between 0 and 1
+        return Math.max(0, Math.min(1, probability));
+    }
+
     // Handle wolves hunting deer
     processHunting(deerManager) {
         console.log("WolfManager: Processing hunting");
-        this.wolves.forEach((wolf, wolfIndex) => {
-            if (!wolf.isAlive()) return;
-
-            let consumed = 0;
-            let attempts = 0;
-            console.log(`Wolf ${wolfIndex} starting hunt. Stamina: ${wolf.stamina}, Hunger: ${wolf.hunger}`);
-
-            // Use stamina as search attempts
-            while (attempts < wolf.stamina && !this.isSatisfied(consumed, wolf.hunger)) {
-                const randomIndex = Math.floor(Math.random() * deerManager.deers.length);
-                const deer = deerManager.deers[randomIndex];
-                
-                if (deer && deer.isAlive()) {
-                    consumed += deer.mass;
-                    deerManager.killDeer(randomIndex);
-                    console.log(`Wolf ${wolfIndex} caught deer at position ${randomIndex}. Total consumed: ${consumed}`);
-                }
-                
-                attempts++;
+        
+        // Get all available deer
+        const availableDeer = deerManager.deers.filter(deer => deer.isAlive());
+        const initialDeerCount = availableDeer.length;
+        
+        console.log(`WolfManager: Starting hunting cycle. Available deer: ${initialDeerCount}`);
+        
+        // Make a copy of the available deer to track which ones remain
+        let remainingDeer = [...availableDeer];
+        
+        // Sort wolves by stamina (stronger wolves hunt first)
+        const sortedWolfIndices = this.wolves
+            .map((wolf, index) => ({ wolf, index }))
+            .filter(item => item.wolf.isAlive())
+            .sort((a, b) => b.wolf.stamina - a.wolf.stamina)
+            .map(item => item.index);
+        
+        for (const wolfIndex of sortedWolfIndices) {
+            const wolf = this.wolves[wolfIndex];
+            
+            // No deer left means the wolf has no chance to find food
+            if (remainingDeer.length === 0) {
+                console.log(`WolfManager: Wolf ${wolfIndex} died: No deer remain`);
+                this.killWolf(wolfIndex);
+                continue;
             }
-
-            if (!this.isSatisfied(consumed, wolf.hunger)) {
-                console.log(`Wolf ${wolfIndex} died from starvation: consumed ${consumed}/${wolf.hunger} after ${attempts} attempts`);
+            
+            // Calculate how many deer this wolf needs based on hunger
+            // Wolves need less food per hunt than deer need trees
+            const avgDeerMass = remainingDeer.reduce((sum, d) => sum + d.mass, 0) / remainingDeer.length;
+            const deerNeededForHunger = Math.ceil(wolf.hunger / avgDeerMass);
+            
+            // Calculate hunting success - wolf's ability to find deer
+            const huntingSuccess = this.calculateHuntingSuccess(
+                wolf,
+                remainingDeer.length,
+                initialDeerCount
+            );
+            
+            // Calculate how many deer the wolf actually catches
+            // This is a probabilistic result between 0 and what it needs
+            const successRate = Math.random() * huntingSuccess;
+            const deerFound = Math.min(
+                Math.ceil(deerNeededForHunger * successRate), 
+                2 // Wolves typically don't catch more than a couple deer at once
+            );
+            
+            // Actual deer captured is limited by what's available
+            const deerCaptured = Math.min(deerFound, remainingDeer.length);
+            
+            // Calculate if wolf found enough food
+            const massNeeded = wolf.hunger;
+            let massConsumed = 0;
+            
+            // Remove captured deer from environment
+            for (let i = 0; i < deerCaptured && remainingDeer.length > 0; i++) {
+                // Take a random deer from the remaining pool
+                const randomIndex = Math.floor(Math.random() * remainingDeer.length);
+                const capturedDeer = remainingDeer[randomIndex];
+                
+                // Remove from available pool
+                remainingDeer.splice(randomIndex, 1);
+                
+                // Remove from deer population (kill the deer)
+                const deerIndex = deerManager.deers.indexOf(capturedDeer);
+                if (deerIndex !== -1) {
+                    deerManager.killDeer(deerIndex);
+                    massConsumed += capturedDeer.mass;
+                }
+            }
+            
+            // Determine if wolf survives based on how much it ate compared to what it needed
+            if (massConsumed >= massNeeded) {
+                console.log(`WolfManager: Wolf ${wolfIndex} survived: caught ${deerCaptured} deer (${massConsumed.toFixed(1)}/${massNeeded.toFixed(1)} mass)`);
+            } else {
+                console.log(`WolfManager: Wolf ${wolfIndex} died: found only ${massConsumed.toFixed(1)}/${massNeeded.toFixed(1)} mass needed`);
                 this.killWolf(wolfIndex);
             }
-        });
+        }
+        
+        const survivingWolves = this.wolves.filter(wolf => wolf.isAlive()).length;
+        console.log(`WolfManager: Hunting cycle complete. ${survivingWolves}/${sortedWolfIndices.length} wolves survived`);
     }
 
     // Helper method to find prey

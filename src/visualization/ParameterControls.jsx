@@ -199,6 +199,9 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
               Stamina Factor
               <input
                 type="number"
+                min="0"
+                max="10"
+                step="0.1"
                 value={config.deer.staminaFactor}
                 onChange={(e) => handleChange('deer', 'staminaFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
@@ -273,8 +276,11 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
               Stamina Factor
               <input
                 type="number"
-                value={config.wolf.staminaFactor}
-                onChange={(e) => handleChange('wolf', 'staminaFactor', e.target.value)}
+                min="0"
+                max="10"
+                step="0.1"
+                value={config.deer.staminaFactor}
+                onChange={(e) => handleChange('deer', 'staminaFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
             </label>
