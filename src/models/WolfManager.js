@@ -112,17 +112,25 @@ class WolfManager {
     }
 
     // Create new wolf births
-    reproduce(maturity) {
-        console.log("WolfManager: Processing reproduction");
-        const newBirths = this.wolves.reduce((count, wolf) => {
-            if (wolf.age >= maturity && Math.random() < 0.5) {
+    reproduce(maturity, reproductionFactor = 1.0) {
+        console.log("WolfManager: Processing reproduction with factor:", reproductionFactor);
+        
+        const aliveWolves = this.wolves.filter(wolf => wolf.isAlive());
+        const matureWolves = aliveWolves.filter(wolf => wolf.age >= maturity);
+        
+        // Apply reproduction factor to control birth rates
+        const baseBirthRate = matureWolves.reduce((count, wolf) => {
+            if (Math.random() < 0.5) {
                 return count + 1;
             }
             return count;
         }, 0);
-
-        console.log(`WolfManager: ${newBirths} new wolves will be born`);
-
+        
+        // Apply the reproduction factor
+        const newBirths = Math.floor(baseBirthRate * reproductionFactor);
+    
+        console.log(`WolfManager: ${newBirths} new wolves will be born (base: ${baseBirthRate}, factor: ${reproductionFactor})`);
+    
         for (let i = 0; i < newBirths; i++) {
             const newPos = this.findEmptyPosition();
             if (newPos === -1) {

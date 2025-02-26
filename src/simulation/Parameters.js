@@ -17,7 +17,9 @@ export const SimulationParameters = {
         density: 17,          // trees per 81m²
         stressLevel: 20,      // between 1 & 100
         stressIndex: 81,      // 101 - stressLevel
-        maturity: 10
+        maturity: 10,
+        reproductionFactor: 1.0,  // NEW: Controls tree reproduction rate (1.0 = normal)
+        edibleAge: 2          // NEW: Maximum age at which trees are edible by deer
     },
 
     // Deer parameters
@@ -28,7 +30,9 @@ export const SimulationParameters = {
         },
         staminaFactor: 100000.0,
         hungerFactor: 5.0,
-        maturity: 3
+        maturity: 3,
+        reproductionFactor: 1.0,  // NEW: Controls deer reproduction rate (1.0 = normal)
+        migrationFactor: 1.0      // Exists already in your implementation
     },
 
     // Wolf parameters
@@ -39,6 +43,8 @@ export const SimulationParameters = {
         },
         staminaFactor: 1.0,
         hungerFactor: 1.0,
-        maturity: 2
+        maturity: 2,
+        reproductionFactor: 1.0,  // NEW: Controls wolf reproduction rate (1.0 = normal)
+        migrationFactor: 0.5      // Exists already in your implementation
     }
 };

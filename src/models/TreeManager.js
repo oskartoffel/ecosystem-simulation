@@ -119,13 +119,16 @@ class TreeManager {
         }
     }
 
-    reproduce(maturityAge) {
+    reproduce(maturityAge, reproductionFactor = 1.0) {
         const matureTrees = this.trees.filter(tree => tree && tree.age >= maturityAge).length;
+        // Apply the reproduction factor to control new tree generation
+        const adjustedTreeCount = Math.floor(matureTrees * reproductionFactor);
+        
         // Only log during main simulation
         if (!this.isStabilizing) {
-            console.log(`TreeManager: Found ${matureTrees} mature trees (age >= ${maturityAge})`);
+            console.log(`TreeManager: Found ${matureTrees} mature trees (age >= ${maturityAge}), adjusted to ${adjustedTreeCount} with factor ${reproductionFactor}`);
         }
-        this.plantYoungTrees(matureTrees);
+        this.plantYoungTrees(adjustedTreeCount);
     }
 
     plantYoungTrees(amount) {

@@ -160,7 +160,11 @@ class SimulationManager {
             this.treeManager.grow();
             this.treeManager.processAgeDeaths();
             this.treeManager.processStressDeaths(this.config.tree.stressIndex);
-            this.treeManager.reproduce(this.config.tree.maturity);
+            // Pass reproduction factor to control tree reproduction
+            this.treeManager.reproduce(
+                this.config.tree.maturity, 
+                this.config.tree.reproductionFactor || 1.0
+            );
             
             // Deer lifecycle
             // Process deer migration first - add new individuals if population is low
@@ -174,13 +178,22 @@ class SimulationManager {
                 }
             }
             
-            this.deerManager.reproduce(this.config.deer.maturity);
+            // Pass reproduction factor to control deer reproduction
+            this.deerManager.reproduce(
+                this.config.deer.maturity,
+                this.config.deer.reproductionFactor || 1.0
+            );
+            
             this.deerManager.grow(
                 this.config.deer.staminaFactor,
                 this.config.deer.hungerFactor
             );
             this.deerManager.processNaturalDeaths();
-            this.deerManager.processFeeding(this.treeManager.trees);
+            // Pass edible age parameter to control what trees deer can eat
+            this.deerManager.processFeeding(
+                this.treeManager.trees, 
+                this.config.tree.edibleAge || 2
+            );
             
             // Wolf lifecycle
             // Process wolf migration first - add new individuals if population is low
@@ -194,7 +207,12 @@ class SimulationManager {
                 }
             }
             
-            this.wolfManager.reproduce(this.config.wolf.maturity);
+            // Pass reproduction factor to control wolf reproduction
+            this.wolfManager.reproduce(
+                this.config.wolf.maturity,
+                this.config.wolf.reproductionFactor || 1.0
+            );
+            
             this.wolfManager.grow(
                 this.config.wolf.staminaFactor,
                 this.config.wolf.hungerFactor

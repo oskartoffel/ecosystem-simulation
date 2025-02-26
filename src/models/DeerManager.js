@@ -104,23 +104,26 @@ class DeerManager {
     }
 
     // Create new deer births
-    reproduce(maturity) {
+    reproduce(maturity, reproductionFactor = 1.0) {
         const aliveDeer = this.deers.filter(deer => deer.isAlive());
         const matureDeer = aliveDeer.filter(deer => deer.age >= maturity);
         
         console.log('Deer Reproduction Debug:', {
             totalDeer: aliveDeer.length,
-            matureDeer: matureDeer.length
+            matureDeer: matureDeer.length,
+            reproductionFactor: reproductionFactor
         });
     
         // Calculate new births based on population density and individual fitness
+        // Apply the reproduction factor to control birth rate
         const newBirths = matureDeer.reduce((count, deer) => {
             const populationDensity = aliveDeer.length / this.deers.length;
             const reproductionProbability = 
                 0.5 *  // Base probability
                 (1 - populationDensity) *  // Reduce probability as population grows
                 (deer.stamina / 100000.0) *  // Higher stamina increases reproduction chance
-                (1 / (1 + Math.exp(-deer.age + maturity)));  // Probability peaks around maturity
+                (1 / (1 + Math.exp(-deer.age + maturity))) *  // Probability peaks around maturity
+                reproductionFactor;  // NEW: Apply reproduction factor to control birth rate
     
             if (Math.random() < reproductionProbability) {
                 return count + 1;
@@ -128,7 +131,7 @@ class DeerManager {
             return count;
         }, 0);
     
-        console.log(`Potential new deer births: ${newBirths}`);
+        console.log(`Potential new deer births: ${newBirths} (adjusted by factor ${reproductionFactor})`);
     
         // Add new deer to population
         for (let i = 0; i < newBirths; i++) {
@@ -156,25 +159,29 @@ class DeerManager {
     }
 
     // Validate that trees are proper Tree instances
-    findYoungTree(trees) {
+    findYoungTree(trees, maxEdibleAge = 2) {
         // First check if any young trees exist to avoid wasting attempts
-        const youngTrees = trees.filter(tree => tree instanceof Tree && tree.position !== 0 && tree.age <= 2);
+        const edibleTrees = trees.filter(tree => 
+            tree instanceof Tree && tree.position !== 0 && tree.age <= maxEdibleAge);
         
-        if (youngTrees.length === 0) {
-            return null; // No young trees available
+        if (edibleTrees.length === 0) {
+            return null; // No edible trees available
         }
         
-        // Select a random young tree directly from the filtered list
-        const randomIndex = Math.floor(Math.random() * youngTrees.length);
-        return youngTrees[randomIndex];
+        // Select a random edible tree directly from the filtered list
+        const randomIndex = Math.floor(Math.random() * edibleTrees.length);
+        return edibleTrees[randomIndex];
     }
     
+    isTreeEdible(tree, maxEdibleAge) {
+        return tree instanceof Tree && tree.position !== 0 && tree.age <= maxEdibleAge;
+    }
 
     // Handle deer eating trees
-    processFeeding(trees) {
+    processFeeding(trees, edibleAge = 2) {
         // Just log the initial count once
-        const youngTrees = trees.filter(tree => tree && tree.position !== 0 && tree.age <= 2).length;
-        console.log(`DeerManager: Starting feeding cycle. Available young trees: ${youngTrees}`);
+        const edibleTrees = trees.filter(tree => tree && tree.position !== 0 && tree.age <= edibleAge).length;
+        console.log(`DeerManager: Starting feeding cycle. Available edible trees (age <= ${edibleAge}): ${edibleTrees}`);
     
         this.deers.forEach((deer, deerIndex) => {
             if (!deer.isAlive()) return;
@@ -184,10 +191,10 @@ class DeerManager {
             let successfulFinds = 0;
             
             while (attempts < deer.stamina && !this.isSatisfied(consumed, deer.hunger)) {
-                const youngTree = this.findYoungTree(trees);
-                if (youngTree) {
-                    consumed += youngTree.mass;
-                    const treeIndex = trees.indexOf(youngTree);
+                const edibleTree = this.findYoungTree(trees, edibleAge);
+                if (edibleTree) {
+                    consumed += edibleTree.mass;
+                    const treeIndex = trees.indexOf(edibleTree);
                     if (treeIndex !== -1) {
                         trees[treeIndex] = new Tree(0, 0, 0, 0, 0);
                         successfulFinds++;

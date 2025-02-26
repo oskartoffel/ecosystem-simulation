@@ -140,6 +140,27 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
             </label>
+            <label className="block">
+              Reproduction Factor
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={config.tree.reproductionFactor || 1.0}
+                onChange={(e) => handleChange('tree', 'reproductionFactor', e.target.value)}
+                className="w-full mt-1 px-2 py-1 border rounded"
+              />
+            </label>
+            <label className="block">
+              Edible Age
+              <input
+                type="number"
+                min="1"
+                value={config.tree.edibleAge || 2}
+                onChange={(e) => handleChange('tree', 'edibleAge', e.target.value)}
+                className="w-full mt-1 px-2 py-1 border rounded"
+              />
+            </label>
           </div>
         </div>
 
@@ -200,6 +221,17 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
                 type="number"
                 value={config.deer.hungerFactor}
                 onChange={(e) => handleChange('deer', 'hungerFactor', e.target.value)}
+                className="w-full mt-1 px-2 py-1 border rounded"
+              />
+            </label>
+            <label className="block">
+              Reproduction Factor
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={config.deer.reproductionFactor || 1.0}
+                onChange={(e) => handleChange('deer', 'reproductionFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
             </label>
@@ -265,6 +297,17 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
                 onChange={(e) => handleChange('wolf', 'hungerFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
+            <label className="block">
+              Reproduction Factor
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={config.wolf.reproductionFactor || 1.0}
+                onChange={(e) => handleChange('wolf', 'reproductionFactor', e.target.value)}
+                className="w-full mt-1 px-2 py-1 border rounded"
+              />
+            </label>
             </label>
           </div>
         </div>
