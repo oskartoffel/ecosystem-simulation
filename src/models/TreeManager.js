@@ -7,8 +7,13 @@ class TreeManager {
         this.trees = Array(gridSize).fill(null).map(() => new Tree(0, 0, 0, 0, 0));
         this.grid = Utils.createGrid(gridSize);
         this.gridSize = gridSize;
-        this.isStabilizing = true;  // Add flag for stabilization phase
+        this.isStabilizing = true;
+        this.consumedByDeer = 0;
+        this.initializationDeaths = 0;  // Add this line
+        this.simulationDeaths = 0;      // Add this line
     }
+    
+    
 
     calculateTreeProperties(tree) {
         if (!tree || !(tree instanceof Tree)) return null;
@@ -24,7 +29,7 @@ class TreeManager {
         
         newTree.diameter = 0.01 * tree.age;
         newTree.height = 1.3 + Math.pow((newTree.diameter / (1.95 + 0.13 * newTree.diameter)), 2.0);
-        newTree.mass = 0.0613 * Math.pow(100 * newTree.diameter, 2.7133);
+        newTree.mass = 0.18 * Math.pow(100 * newTree.diameter, 2.7133);
         
         return newTree;
     }
@@ -58,6 +63,9 @@ class TreeManager {
         }
         
         console.log(`Planted ${this.getPopulationCount()} trees`);
+
+        this.initializationDeaths = this.gridSize - this.getPopulationCount();
+        console.log(`TreeManager: Initialization deaths: ${this.initializationDeaths}`);
     }
 
     processConcurrence(density) {
@@ -105,29 +113,64 @@ class TreeManager {
         });
     }
 
-    processStressDeaths(stressProb) {
+    processStressDeaths(stressParam) {
+        // Check which parameter system we're using (old or new)
+        let stressProbability;
+        
+        if (stressParam > 10) {
+            // Old stressIndex format (higher = less stress, e.g. 85)
+            stressProbability = 1 / stressParam; 
+        } else {
+            // New stressLevel format (1-10 scale)
+            stressProbability = stressParam / 100;
+        }
+        
+        let deathCount = 0;
         this.trees.forEach((tree, index) => {
-            if (tree && tree.position !== 0 && Math.random() < 1/stressProb) {
+            if (tree && tree.position !== 0 && Math.random() < stressProbability) {
                 this.removeTree(index);
+                deathCount++;
             }
         });
+        
+        console.log(`TreeManager: ${deathCount} trees died from environmental stress (level ${stressParam})`);
     }
 
     removeTree(index) {
-        if (index >= 0 && index < this.trees.length) {
+        if (index >= 0 && index < this.trees.length && this.trees[index].position !== 0) {
             this.trees[index] = new Tree(0, 0, 0, 0, 0);
+            this.simulationDeaths++;  // Track each actual death
         }
     }
 
-    reproduce(maturityAge, reproductionFactor = 1.0) {
+    markAsConsumedByDeer(index) {
+        if (index >= 0 && index < this.trees.length && this.trees[index].position !== 0) {
+            this.trees[index] = new Tree(0, 0, 0, 0, 0);
+            this.consumedByDeer++;
+        }
+    }
+
+    reproduce(maturityAge, reproductionFactor = 5.0) {
+        // Scale factor where 5 is "normal" reproduction
+        const scaledReproFactor = reproductionFactor / 5.0;
+        
         const matureTrees = this.trees.filter(tree => tree && tree.age >= maturityAge).length;
-        // Apply the reproduction factor to control new tree generation
-        const adjustedTreeCount = Math.floor(matureTrees * reproductionFactor);
+        
+        // Calculate baseline new tree count as a percentage of mature trees
+        // with adjustment for forest density
+        const totalTreeCount = this.getPopulationCount();
+        const forestDensity = totalTreeCount / this.trees.length;
+        const densityFactor = Math.max(0.1, 1 - forestDensity); // Lower reproduction in dense forests
+        
+        // Calculate baseline reproduction and apply the reproduction factor
+        const baseNewTrees = Math.ceil(matureTrees * 0.1 * densityFactor);
+        const adjustedTreeCount = Math.floor(baseNewTrees * scaledReproFactor);
         
         // Only log during main simulation
         if (!this.isStabilizing) {
-            console.log(`TreeManager: Found ${matureTrees} mature trees (age >= ${maturityAge}), adjusted to ${adjustedTreeCount} with factor ${reproductionFactor}`);
+            console.log(`TreeManager: Found ${matureTrees} mature trees (age >= ${maturityAge}), density factor: ${densityFactor.toFixed(2)}, base trees: ${baseNewTrees}, adjusted to ${adjustedTreeCount} with factor ${reproductionFactor}`);
         }
+        
         this.plantYoungTrees(adjustedTreeCount);
     }
 
@@ -172,22 +215,25 @@ class TreeManager {
         return this.trees.filter(tree => tree && tree.position !== 0).length;
     }
 
-    getStatistics() {
-        const aliveTrees = this.trees.filter(tree => tree && tree.position !== 0);
-        const deaths = this.trees.filter(tree => !tree || tree.position === 0).length;
-        const youngTrees = aliveTrees.filter(tree => tree.age <= 2).length;
+    getStatistics() { 
+        const aliveTrees = this.trees.filter(tree => tree && tree.position !== 0); 
+        const youngTrees = aliveTrees.filter(tree => tree.age <= 2).length; 
         
-        const stats = {
-            total: aliveTrees.length,
-            averageAge: aliveTrees.reduce((sum, tree) => sum + tree.age, 0) / aliveTrees.length || 0,
-            deaths: deaths,
-            youngTrees: youngTrees,
-            averageHeight: aliveTrees.reduce((sum, tree) => sum + tree.height, 0) / aliveTrees.length || 0
-        };
+        const stats = { 
+            total: aliveTrees.length, 
+            averageAge: aliveTrees.reduce((sum, tree) => sum + tree.age, 0) / aliveTrees.length || 0, 
+            deaths: this.simulationDeaths,  // Use tracked simulation deaths
+            youngTrees: youngTrees, 
+            averageHeight: aliveTrees.reduce((sum, tree) => sum + tree.height, 0) / aliveTrees.length || 0,
+            consumedByDeer: this.consumedByDeer
+        }; 
         
-        console.log(`Tree Statistics: Population=${stats.total}, Young Trees=${youngTrees}, Avg Age=${stats.averageAge.toFixed(1)}, Deaths=${deaths}`);
+        console.log(`Tree Statistics: Population=${stats.total}, Young Trees=${youngTrees}, Avg Age=${stats.averageAge.toFixed(1)}, Deaths=${this.simulationDeaths}`); 
         
-        return stats;
+        // Reset consumedByDeer for next cycle
+        this.consumedByDeer = 0;
+        
+        return stats; 
     }
 
     getAgeDistribution(aliveTrees) {

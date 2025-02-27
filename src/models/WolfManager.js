@@ -53,14 +53,13 @@ class WolfManager {
 
     // Helper method to calculate stamina
     calculateStamina(age, staminaFactor) {
-        // New method using a 0-10 scale directly
-        
         // Base curve that peaks at age 4-5
         const baseCurve = Math.max(0, 10 - Math.pow(age - 4.5, 2) / 2.5);
         
-        // Apply the staminaFactor as a direct multiplier
+        // Directly use the staminaFactor (already 1-10 scale)
         return Math.min(10, baseCurve * (staminaFactor / 5));
     }
+    
 
     // Find empty position for new wolf
     findEmptyPosition() {
@@ -116,32 +115,50 @@ class WolfManager {
     }
 
     // Create new wolf births
-    reproduce(maturity, reproductionFactor = 1.0) {
-        console.log("WolfManager: Processing reproduction with factor:", reproductionFactor);
+    reproduce(maturity, reproductionFactor = 5.0) {
+        // Apply reproduction factor (5 is baseline)
+        const scaledReproFactor = reproductionFactor / 5.0;
         
         const aliveWolves = this.wolves.filter(wolf => wolf.isAlive());
         const matureWolves = aliveWolves.filter(wolf => wolf.age >= maturity);
         
-        // Apply reproduction factor to control birth rates
-        const baseBirthRate = matureWolves.reduce((count, wolf) => {
-            if (Math.random() < 0.5) {
-                return count + 1;
-            }
-            return count;
-        }, 0);
+        console.log("WolfManager: Processing reproduction with factor:", reproductionFactor);
+        console.log(`WolfManager: Mature wolves: ${matureWolves.length}/${aliveWolves.length}`);
         
-        // Apply the reproduction factor
-        const newBirths = Math.floor(baseBirthRate * reproductionFactor);
-    
-        console.log(`WolfManager: ${newBirths} new wolves will be born (base: ${baseBirthRate}, factor: ${reproductionFactor})`);
-    
+        // Ensure small packs get a reproduction boost
+        const packSizeBoost = aliveWolves.length < 4 ? 2.0 : 1.0;
+        
+        // Base birth rate tracking
+        let baseBirthRate = 0;
+        
+        // Calculate individual reproduction probability for each mature wolf
+        matureWolves.forEach(wolf => {
+            // Increase survival chance with smaller packs
+            const individualProb = 
+                0.25 * // Increased base rate 
+                (1 - (aliveWolves.length / (this.wolves.length * 0.2))) * // Less density penalty
+                (wolf.stamina / 10) * 
+                scaledReproFactor *
+                packSizeBoost; // Add boost for small packs
+            
+            if (Math.random() < individualProb) {
+                baseBirthRate++;
+            }
+        });
+        
+        // Round to ensure we get whole wolves
+        const newBirths = Math.max(0, Math.round(baseBirthRate));
+        
+        console.log(`WolfManager: ${newBirths} new wolves will be born (factor: ${reproductionFactor})`);
+        
+        // Create new wolves
         for (let i = 0; i < newBirths; i++) {
             const newPos = this.findEmptyPosition();
             if (newPos === -1) {
                 console.log("WolfManager: No more space for new wolves");
                 break;
             }
-            this.wolves[newPos] = new Wolf(newPos, 0, 0, 0, 0);
+            this.wolves[newPos] = new Wolf(newPos + 1, 0, 0, 0, 0);
             console.log(`WolfManager: New wolf born at position ${newPos}`);
         }
     }
@@ -210,9 +227,9 @@ class WolfManager {
                 continue;
             }
             
-            // Calculate how many deer this wolf needs based on hunger
-            const avgDeerMass = remainingDeer.reduce((sum, d) => sum + d.mass, 0) / remainingDeer.length;
-            const deerNeededForHunger = Math.ceil(wolf.hunger / avgDeerMass);
+            // Scale hunger based on hunger factor (5 is baseline)
+            // A wolf with hungerFactor=5 needs about 0.6 of a deer's mass
+            const massNeeded = wolf.hunger * (wolf.mass / 20);
             
             // Calculate hunting success - wolf's ability to find deer
             const huntingSuccess = this.calculateHuntingSuccess(
@@ -221,20 +238,19 @@ class WolfManager {
                 initialDeerCount
             );
             
-            // Calculate how many deer the wolf actually catches - more generous approach
-            // Use a minimum success rate to avoid complete failure when huntingSuccess is decent
+            // Calculate how many deer the wolf has a chance to catch
             const minSuccessRate = Math.min(0.4, huntingSuccess); // At least 40% if possible
             const successRate = minSuccessRate + (Math.random() * (huntingSuccess - minSuccessRate));
-            const deerFound = Math.max(1, Math.ceil(deerNeededForHunger * successRate));
+            const deerFound = Math.max(1, Math.ceil(wolf.hunger * successRate));
             
             // Log the probability calculations
             const wolfCount = this.wolves.filter(w => w.isAlive()).length;
             console.log(`WolfManager: Wolf ${wolfIndex} hunting - success prob: ${huntingSuccess.toFixed(2)}, ` + 
-                       `applied rate: ${successRate.toFixed(2)}, deer needed: ${deerNeededForHunger}, ` +
-                       `deer found: ${deerFound}, stamina: ${wolf.stamina.toFixed(1)}, ` +
-                       `age: ${wolf.age.toFixed(1)}, pack size: ${wolfCount}`);
+                        `applied rate: ${successRate.toFixed(2)}, mass needed: ${massNeeded.toFixed(1)}, ` +
+                        `deer found: ${deerFound}, stamina: ${wolf.stamina.toFixed(1)}, ` +
+                        `age: ${wolf.age.toFixed(1)}, pack size: ${wolfCount}`);
             
-            // Actual deer captured is limited by what's available
+            // Actual deer captured is limited
             const deerCaptured = Math.min(
                 deerFound,
                 2, // Wolves typically don't catch more than a couple deer at once
@@ -242,7 +258,6 @@ class WolfManager {
             );
             
             // Calculate if wolf found enough food
-            const massNeeded = wolf.hunger;
             let massConsumed = 0;
             
             // Remove captured deer from environment
@@ -254,16 +269,25 @@ class WolfManager {
                 // Remove from available pool
                 remainingDeer.splice(randomIndex, 1);
                 
+                // Calculate how much of the deer the wolf actually consumes
+                // Wolf takes what it needs, not the entire deer
+                const massFromThisDeer = Math.min(capturedDeer.mass, massNeeded - massConsumed);
+                
                 // Remove from deer population (kill the deer)
                 const deerIndex = deerManager.deers.indexOf(capturedDeer);
                 if (deerIndex !== -1) {
                     deerManager.killDeer(deerIndex);
-                    massConsumed += capturedDeer.mass;
+                    massConsumed += massFromThisDeer;
+                    
+                    // If wolf has enough food, stop hunting
+                    if (massConsumed >= massNeeded) {
+                        break;
+                    }
                 }
             }
             
             // Determine if wolf survives based on how much it ate compared to what it needed
-            // More lenient - now only needs 60% of its hunger satisfied to survive
+            // Now needs 60% of its hunger satisfied to survive
             if (massConsumed >= massNeeded * 0.6) {
                 console.log(`WolfManager: Wolf ${wolfIndex} survived: caught ${deerCaptured} deer (${massConsumed.toFixed(1)}/${massNeeded.toFixed(1)} mass)`);
             } else {
@@ -276,36 +300,35 @@ class WolfManager {
         console.log(`WolfManager: Hunting cycle complete. ${survivingWolves}/${sortedWolfIndices.length} wolves survived`);
     }
     
+    
     // Helper method to calculate hunting success (ability to catch prey)
     calculateHuntingSuccess(wolf, availableDeerCount, initialDeerCount) {
         // No deer means no chance of finding food
         if (availableDeerCount === 0) return 0;
         
-        // Base probability depends on prey availability
-        const availabilityFactor = availableDeerCount / Math.max(1, initialDeerCount);
+        // Base probability depends on prey availability - more scarce = harder to find
+        const availabilityFactor = Math.min(1.0, Math.sqrt(availableDeerCount / Math.max(1, initialDeerCount)));
         
-        // Use stamina directly (assuming 0-10 scale from control panel)
-        // Handle the transition period when stamina values might still be large
-        const staminaFactor = (wolf.stamina > 100) ? 
-            Math.min(1.0, wolf.stamina / 300) : // For old large values (transition period)
-            Math.min(1.0, wolf.stamina / 10);   // For new 0-10 scale
+        // Use stamina directly (from 0-10 scale)
+        const staminaFactor = Math.min(1.0, wolf.stamina / 10);
         
         // Age factor - prime-age wolves have advantage
         const ageFactor = 1.0 - Math.abs(wolf.age - 4) / 8; // Peak at age 4
         
         // Pack dynamics - wolves hunt better in packs
         const wolfCount = this.wolves.filter(w => w.isAlive()).length;
-        const packFactor = Math.min(1.5, 0.7 + (wolfCount / 5)); // Max 50% bonus for packs of 5+
+        // Pack factor increases up to 1.5 for packs of 5+, but smaller packs have disadvantage
+        const packFactor = Math.min(1.5, 0.7 + (wolfCount / 10));
         
-        // Combined probability - higher base success rate to improve survival
+        // Combined probability
         let probability = 
-            (0.5 + 0.4 * availabilityFactor) * // Higher base chance + availability impact
-            (0.7 + 0.3 * staminaFactor) *      // Stamina boost
+            (0.4 + 0.4 * availabilityFactor) * // Base chance + availability impact
+            (0.6 + 0.4 * staminaFactor) *      // Stamina boost
             (0.7 + 0.3 * ageFactor) *          // Age modifier
             packFactor;                         // Pack bonus
         
         // Cap probability between 0 and 1
-        return Math.max(0, Math.min(1, probability));
+        return Math.max(0, Math.min(0.9, probability)); // Max 90% success
     }
     
 
@@ -360,16 +383,20 @@ class WolfManager {
     }
 
     
-    // Process random migration of wolves into the ecosystem
+    // Update migration to use 1-10 scale
     processMigration(migrationFactor) {
         // Skip if factor is zero
         if (migrationFactor <= 0) return;
         
+        // Scale migration factor where 5 is "normal"
+        const packSizeBoost = this.getPopulationCount() < 3 ? 2.0 : 1.0;
+        const scaledFactor = (migrationFactor / 5.0) * packSizeBoost;
+        
         // Base migration rate lower than deer (predators are typically less abundant)
-        const baseMigrants = Math.random() < 0.7 ? 1 : 0; // 70% chance of 1 wolf, 30% chance of none
+        const baseMigrants = Math.random() < 0.3 ? 1 : 0; // 30% chance of 1 wolf, 70% chance of none
         
         // Final number of migrants adjusted by the factor
-        const migrantCount = Math.max(0, Math.round(baseMigrants * migrationFactor));
+        const migrantCount = Math.max(0, Math.round(baseMigrants * scaledFactor));
         
         if (migrantCount > 0) {
             console.log(`WolfManager: ${migrantCount} wolves migrating into the ecosystem`);
@@ -388,8 +415,8 @@ class WolfManager {
                 
                 // Calculate properties based on age
                 tempWolf.mass = age > 4 ? 28 : age * 7;
-                tempWolf.hunger = age > 4 ? 1.0 : (age * 1.0 / 4.0);
-                tempWolf.stamina = this.calculateStamina(age, 300.0); // Fixed stamina factor for migrants
+                tempWolf.hunger = age > 4 ? 5.0 : (age * 5.0 / 4.0); // Use 5 as baseline hunger
+                tempWolf.stamina = this.calculateStamina(age, 5.0); // Use 5 as baseline stamina
                 
                 this.wolves[newPos] = tempWolf;
                 successfulMigrants++;

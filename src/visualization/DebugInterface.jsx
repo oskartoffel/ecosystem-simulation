@@ -44,7 +44,7 @@ const DebugInterface = () => {
       initial: 20,
       arraySize: 500,
       maturity: 2,
-      staminaFactor: 10000.0,
+      staminaFactor: 5.0,
       hungerFactor: 5.0,
       migrationFactor: 1.0
     },
@@ -52,7 +52,7 @@ const DebugInterface = () => {
       initial: 5,
       arraySize: 200,
       maturity: 2,
-      staminaFactor: 300.0,
+      staminaFactor: 5.0,
       hungerFactor: 1.0,
       migrationFactor: 0.5
     }

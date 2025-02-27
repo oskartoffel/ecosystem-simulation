@@ -132,24 +132,29 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
               />
             </label>
             <label className="block">
-              Stress Index
+              Stress Level (1-10)
               <input
                 type="number"
-                value={config.tree.stressIndex}
-                onChange={(e) => handleChange('tree', 'stressIndex', e.target.value)}
+                min="1"
+                max="10"
+                step="0.5"
+                value={config.tree.stressLevel || 5.0}
+                onChange={(e) => handleChange('tree', 'stressLevel', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
             </label>
             <label className="block">
-              Reproduction Factor
+              Reproduction Factor (1-10)
               <input
                 type="number"
-                step="0.1"
-                min="0"
-                value={config.tree.reproductionFactor || 1.0}
+                min="1"
+                max="10"
+                step="0.5"
+                value={config.tree.reproductionFactor || 5.0}
                 onChange={(e) => handleChange('tree', 'reproductionFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
+ 
             </label>
             <label className="block">
               Edible Age
@@ -196,48 +201,56 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
               />
             </label>
             <label className="block">
-              Stamina Factor
+              Stamina Factor (1-10)
               <input
                 type="number"
-                min="0"
+                min="1"
                 max="10"
-                step="0.1"
-                value={config.deer.staminaFactor}
+                step="0.5"
+                value={config.deer.staminaFactor || 5.0}
                 onChange={(e) => handleChange('deer', 'staminaFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
+ 
             </label>
             <label className="block">
-              Migration Factor
+              Migration Factor (1-10)
               <input
                 type="number"
-                step="0.1"
-                min="0"
-                value={config.deer.migrationFactor || 1.0}
+                min="1"
+                max="10"
+                step="0.5"
+                value={config.deer.migrationFactor || 5.0}
                 onChange={(e) => handleChange('deer', 'migrationFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
+ 
             </label>
             <label className="block">
-              Hunger Factor
-              <input
-                type="number"
-                value={config.deer.hungerFactor}
-                onChange={(e) => handleChange('deer', 'hungerFactor', e.target.value)}
-                className="w-full mt-1 px-2 py-1 border rounded"
-              />
+                Hunger Factor (1-10)
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  step="0.1"
+                  value={config.deer.hungerFactor || 5.0}
+                  onChange={(e) => handleChange('deer', 'hungerFactor', e.target.value)}
+                  className="w-full mt-1 px-2 py-1 border rounded"
+                />
             </label>
             <label className="block">
-              Reproduction Factor
+              Reproduction Factor (1-10)
               <input
                 type="number"
-                step="0.1"
-                min="0"
-                value={config.deer.reproductionFactor || 1.0}
+                min="1"
+                max="10"
+                step="0.5"
+                value={config.deer.reproductionFactor || 5.0}
                 onChange={(e) => handleChange('deer', 'reproductionFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
-              />
+                />
             </label>
+
           </div>
         </div>
 
@@ -273,47 +286,55 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
               />
             </label>
             <label className="block">
-              Stamina Factor
+              Stamina Factor (1-10)
               <input
                 type="number"
-                min="0"
+                min="1"
                 max="10"
-                step="0.1"
-                value={config.deer.staminaFactor}
-                onChange={(e) => handleChange('deer', 'staminaFactor', e.target.value)}
+                step="0.5"
+                value={config.wolf.staminaFactor || 5.0}
+                onChange={(e) => handleChange('wolf', 'staminaFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
             </label>
+
             <label className="block">
-            Migration Factor
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              value={config.wolf.migrationFactor || 0.5}
-              onChange={(e) => handleChange('wolf', 'migrationFactor', e.target.value)}
-              className="w-full mt-1 px-2 py-1 border rounded"
-            />
-            </label>
-            <label className="block">
-              Hunger Factor
+              Hunger Factor (1-10)
               <input
                 type="number"
-                value={config.wolf.hungerFactor}
+                min="1"
+                max="10"
+                step="0.5"
+                value={config.wolf.hungerFactor || 5.0}
                 onChange={(e) => handleChange('wolf', 'hungerFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
+            </label>
+
             <label className="block">
-              Reproduction Factor
+              Migration Factor (1-10)
               <input
                 type="number"
-                step="0.1"
-                min="0"
-                value={config.wolf.reproductionFactor || 1.0}
-                onChange={(e) => handleChange('wolf', 'reproductionFactor', e.target.value)}
+                min="1"
+                max="10"
+                step="0.5"
+                value={config.wolf.migrationFactor || 5.0}
+                onChange={(e) => handleChange('wolf', 'migrationFactor', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
             </label>
+
+            <label className="block">
+              Reproduction Factor (1-10)
+              <input
+                type="number"
+                min="1"
+                max="10"
+                step="0.5"
+                value={config.wolf.reproductionFactor || 5.0}
+                onChange={(e) => handleChange('wolf', 'reproductionFactor', e.target.value)}
+                className="w-full mt-1 px-2 py-1 border rounded"
+              />
             </label>
           </div>
         </div>

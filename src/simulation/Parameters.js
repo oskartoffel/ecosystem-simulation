@@ -14,12 +14,11 @@ export const SimulationParameters = {
             ageAvg: 50,
             ageSigma: 20
         },
-        density: 17,          // trees per 81m²
-        stressLevel: 20,      // between 1 & 100
-        stressIndex: 81,      // 101 - stressLevel
-        maturity: 10,
-        reproductionFactor: 1.0,  // NEW: Controls tree reproduction rate (1.0 = normal)
-        edibleAge: 2          // NEW: Maximum age at which trees are edible by deer
+        density: 17,          // trees per 81m² (1-20 scale)
+        stressLevel: 5,       // Stress level (1-10 scale), higher = more stress deaths
+        maturity: 10,         // Age at which trees can reproduce
+        reproductionFactor: 5, // Reproduction rate (1-10 scale), 5 = normal
+        edibleAge: 4          // Maximum age at which trees are edible by deer
     },
 
     // Deer parameters
@@ -28,11 +27,11 @@ export const SimulationParameters = {
             number: 20,
             populationSize: 100
         },
-        staminaFactor: 5.0,
-        hungerFactor: 5.0,
-        maturity: 3,
-        reproductionFactor: 1.0,  // NEW: Controls deer reproduction rate (1.0 = normal)
-        migrationFactor: 1.0      // Exists already in your implementation
+        staminaFactor: 5.0,   // Stamina factor (1-10 scale), 5 = normal
+        hungerFactor: 5.0,    // Hunger factor (1-10 scale), 5 = normal
+        maturity: 3,          // Age at which deer can reproduce
+        reproductionFactor: 5.0, // Reproduction rate (1-10 scale), 5 = normal
+        migrationFactor: 5.0    // Migration rate (1-10 scale), 5 = normal
     },
 
     // Wolf parameters
@@ -41,10 +40,10 @@ export const SimulationParameters = {
             number: 5,
             populationSize: 100
         },
-        staminaFactor: 5.0,
-        hungerFactor: 1.0,
-        maturity: 2,
-        reproductionFactor: 1.0,  // NEW: Controls wolf reproduction rate (1.0 = normal)
-        migrationFactor: 0.5      // Exists already in your implementation
+        staminaFactor: 5.0,   // Stamina factor (1-10 scale), 5 = normal
+        hungerFactor: 5.0,    // Hunger factor (1-10 scale), 5 = normal
+        maturity: 2,          // Age at which wolves can reproduce
+        reproductionFactor: 5.0, // Reproduction rate (1-10 scale), 5 = normal
+        migrationFactor: 5.0    // Migration rate (1-10 scale), 5 = normal
     }
 };

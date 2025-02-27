@@ -46,14 +46,14 @@ class SimulationManager {
                 initial: 20,
                 arraySize: 200,
                 maturity: 2,
-                staminaFactor: 100000.0,
+                staminaFactor: 5,
                 hungerFactor: 2.0
             },
             wolf: {
                 initial: 5,
                 arraySize: 100,
                 maturity: 2,
-                staminaFactor: 30,
+                staminaFactor: 5,
                 hungerFactor: 1.0
             }
         };
@@ -107,7 +107,7 @@ class SimulationManager {
         for (let i = 0; i < this.config.stabilizationYears; i++) {
             this.treeManager.grow();
             this.treeManager.processConcurrence(this.config.tree.density);
-            this.treeManager.processStressDeaths(this.config.tree.stressIndex);
+            this.treeManager.processStressDeaths(this.config.tree.stressLevel || 1);
             this.treeManager.reproduce(this.config.tree.maturity);
             this.treeManager.processAgeDeaths();
             
@@ -155,33 +155,36 @@ class SimulationManager {
         }
         
         try {
+            // Track initial populations
+            const initialTreeCount = this.treeManager.getPopulationCount();
+            const initialDeerCount = this.deerManager.getPopulationCount();
+            const initialWolfCount = this.wolfManager.getPopulationCount();
+    
             // Tree lifecycle
             this.treeManager.processConcurrence(this.config.tree.density);
             this.treeManager.grow();
             this.treeManager.processAgeDeaths();
-            this.treeManager.processStressDeaths(this.config.tree.stressIndex);
-            // Pass reproduction factor to control tree reproduction
+            this.treeManager.processStressDeaths(this.config.tree.stressLevel || 1);
             this.treeManager.reproduce(
                 this.config.tree.maturity, 
-                this.config.tree.reproductionFactor || 1.0
+                this.config.tree.reproductionFactor || 5.0
             );
             
             // Deer lifecycle
-            // Process deer migration first - add new individuals if population is low
+            // Process deer migration first
             const deerPopulation = this.deerManager.getPopulationCount();
             if (deerPopulation < 10) {  // Apply migration if population is low
                 this.deerManager.processMigration(this.config.deer.migrationFactor);
             } else {
-                // Still allow some migration, but with lower probability for healthy populations
-                if (Math.random() < 0.2) {  // 20% chance of migration even for healthy populations
-                    this.deerManager.processMigration(this.config.deer.migrationFactor * 0.5);  // Reduce factor
+                // Still allow some migration with lower probability
+                if (Math.random() < 0.2) {
+                    this.deerManager.processMigration(this.config.deer.migrationFactor * 0.5);
                 }
             }
             
-            // Pass reproduction factor to control deer reproduction
             this.deerManager.reproduce(
                 this.config.deer.maturity,
-                this.config.deer.reproductionFactor || 1.0
+                this.config.deer.reproductionFactor || 5.0
             );
             
             this.deerManager.grow(
@@ -189,28 +192,25 @@ class SimulationManager {
                 this.config.deer.hungerFactor
             );
             this.deerManager.processNaturalDeaths();
-            // Pass edible age parameter to control what trees deer can eat
             this.deerManager.processFeeding(
                 this.treeManager.trees, 
-                this.config.tree.edibleAge || 2
+                this.config.tree.edibleAge || 4
             );
             
             // Wolf lifecycle
-            // Process wolf migration first - add new individuals if population is low
             const wolfPopulation = this.wolfManager.getPopulationCount();
             if (wolfPopulation < 3) {  // Apply migration if population is low
                 this.wolfManager.processMigration(this.config.wolf.migrationFactor);
             } else {
-                // Still allow some migration, but with lower probability for healthy populations
-                if (Math.random() < 0.1) {  // 10% chance of migration even for healthy populations
-                    this.wolfManager.processMigration(this.config.wolf.migrationFactor * 0.3);  // Reduce factor more
+                // Still allow some migration with lower probability
+                if (Math.random() < 0.1) {
+                    this.wolfManager.processMigration(this.config.wolf.migrationFactor * 0.3);
                 }
             }
             
-            // Pass reproduction factor to control wolf reproduction
             this.wolfManager.reproduce(
                 this.config.wolf.maturity,
-                this.config.wolf.reproductionFactor || 1.0
+                this.config.wolf.reproductionFactor || 5.0
             );
             
             this.wolfManager.grow(
@@ -219,6 +219,17 @@ class SimulationManager {
             );
             this.wolfManager.processNaturalDeaths();
             this.wolfManager.processHunting(this.deerManager);
+            
+            // Calculate deaths
+            const finalTreeCount = this.treeManager.getPopulationCount();
+            const finalDeerCount = this.deerManager.getPopulationCount();
+            const finalWolfCount = this.wolfManager.getPopulationCount();
+            
+            // Add death counts to current stats
+            const currentStats = this.getCurrentStats();
+            currentStats.trees.deaths = Math.max(0, initialTreeCount - finalTreeCount);
+            currentStats.deer.deaths = Math.max(0, initialDeerCount - finalDeerCount);
+            currentStats.wolves.deaths = Math.max(0, initialWolfCount - finalWolfCount);
             
             // Record statistics
             this.recordStats();
@@ -230,7 +241,7 @@ class SimulationManager {
                 console.groupEnd();
             }
             
-            return this.getCurrentStats();
+            return currentStats;
         } catch (error) {
             if (this.mode === 'normal') {
                 console.error('Simulation Error:', error);
@@ -251,10 +262,30 @@ class SimulationManager {
 
     recordStats() {
         const currentStats = this.getCurrentStats();
+        
+        // Track deaths from previous cycle to current
+        const prevTreeStats = this.stats.trees.length > 0 ? this.stats.trees[this.stats.trees.length - 1] : null;
+        const prevDeerStats = this.stats.deer.length > 0 ? this.stats.deer[this.stats.deer.length - 1] : null;
+        const prevWolfStats = this.stats.wolves.length > 0 ? this.stats.wolves[this.stats.wolves.length - 1] : null;
+        
+        // Calculate deaths by population difference if not directly provided
+        if (prevTreeStats && !currentStats.trees.deaths) {
+            currentStats.trees.deaths = Math.max(0, prevTreeStats.total - currentStats.trees.total);
+        }
+        
+        if (prevDeerStats && !currentStats.deer.deaths) {
+            currentStats.deer.deaths = Math.max(0, prevDeerStats.total - currentStats.deer.total);
+        }
+        
+        if (prevWolfStats && !currentStats.wolves.deaths) {
+            currentStats.wolves.deaths = Math.max(0, prevWolfStats.total - currentStats.wolves.total);
+        }
+        
         this.stats.trees.push(currentStats.trees);
         this.stats.deer.push(currentStats.deer);
         this.stats.wolves.push(currentStats.wolves);
     }
+    
 
     clearStats() {
         Object.keys(this.stats).forEach(key => {

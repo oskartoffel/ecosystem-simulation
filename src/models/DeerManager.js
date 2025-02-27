@@ -1,6 +1,7 @@
 // models/DeerManager.js
 import { Deer, Tree } from './classes';
 import { Utils } from '../utils/helpers';
+import { TreeManager } from '../models/TreeManager';
 
 class DeerManager {
     constructor() {
@@ -52,15 +53,12 @@ class DeerManager {
 
     // Helper method to calculate stamina
     calculateStamina(age, staminaFactor) {
-        // New method using a 0-10 scale directly
-        // staminaFactor is now a direct multiplier from the UI (also 0-10)
-        
         // Base curve that peaks at age 4-5
-        const baseCurve = Math.max(0, 10 - Math.pow(age - 4.5, 2) / 3);
+        const baseCurve = Math.max(0, 10 - Math.pow(age - 4.5, 2) / 2.5);
         
-        // Apply the staminaFactor as a direct multiplier
+        // Directly use the staminaFactor (already 1-10 scale)
         return Math.min(10, baseCurve * (staminaFactor / 5));
-    }
+      }
 
     // Find empty position for new deer
     findEmptyPosition() {
@@ -109,7 +107,10 @@ class DeerManager {
     }
 
     // Create new deer births
-    reproduce(maturity, reproductionFactor = 1.0) {
+    reproduce(maturity, reproductionFactor = 5.0) {
+        // Scale reproduction factor where 5 is "normal"
+        const scaledReproFactor = reproductionFactor / 5.0;
+        
         const aliveDeer = this.deers.filter(deer => deer.isAlive());
         const matureDeer = aliveDeer.filter(deer => deer.age >= maturity);
         
@@ -119,35 +120,48 @@ class DeerManager {
             reproductionFactor: reproductionFactor
         });
     
-        // Calculate new births based on population density and individual fitness
-        // Apply the reproduction factor to control birth rate
-        const newBirths = matureDeer.reduce((count, deer) => {
+        // Keep track of potential births
+        let potentialBirths = 0;
+        
+        // Calculate new births based on individual deer reproduction chances
+        matureDeer.forEach(deer => {
             const populationDensity = aliveDeer.length / this.deers.length;
+            
+            // Calculate reproduction probability with appropriate scaling
             const reproductionProbability = 
-                0.5 *  // Base probability
+                0.2 *  // Base probability
                 (1 - populationDensity) *  // Reduce probability as population grows
-                (deer.stamina / 100000.0) *  // Higher stamina increases reproduction chance
+                (deer.stamina / 10) *  // Higher stamina increases reproduction chance (now properly scaled)
                 (1 / (1 + Math.exp(-deer.age + maturity))) *  // Probability peaks around maturity
-                reproductionFactor;  // NEW: Apply reproduction factor to control birth rate
+                scaledReproFactor;  // Apply scaled reproduction factor
+            
+            // Debug the probability
+            if (Math.random() < 0.1) { // Only log 10% of calculations to avoid spam
+                console.log(`Deer ${deer.nr} reproduction chance: ${(reproductionProbability * 100).toFixed(2)}% (age: ${deer.age.toFixed(1)}, stamina: ${deer.stamina.toFixed(1)})`);
+            }
     
             if (Math.random() < reproductionProbability) {
-                return count + 1;
+                potentialBirths++;
             }
-            return count;
-        }, 0);
-    
-        console.log(`Potential new deer births: ${newBirths} (adjusted by factor ${reproductionFactor})`);
-    
+        });
+        
+        console.log(`Potential new deer births: ${potentialBirths} (adjusted by factor ${reproductionFactor})`);
+        
         // Add new deer to population
-        for (let i = 0; i < newBirths; i++) {
+        let actualBirths = 0;
+        for (let i = 0; i < potentialBirths; i++) {
             const newPos = this.findEmptyPosition();
-            if (newPos === -1) break; // No more space available
+            if (newPos === -1) {
+                console.log("No more space available for new deer");
+                break; // No more space available
+            }
             
-            const newDeer = new Deer(newPos + 1, 0, 1, 1, 10000);
+            const newDeer = new Deer(newPos + 1, 0, 1, 1, 10);
             this.deers[newPos] = newDeer;
+            actualBirths++;
         }
-    
-        console.log(`Actually added new deer: ${newBirths}`);
+        
+        console.log(`Actually added new deer: ${actualBirths}`);
     }
 
     // Handle natural deaths due to age
@@ -189,7 +203,8 @@ class DeerManager {
         
         const totalEdibleMass = edibleTrees.reduce((sum, tree) => sum + tree.mass, 0);
         const initialEdibleCount = edibleTrees.length;
-        
+
+        console.log(`DeerManager: Edible trees to deer ratio: ${edibleTrees.length}:${this.getPopulationCount()}`);
         // Calculate average tree mass
         const avgTreeMass = initialEdibleCount > 0 ? totalEdibleMass / initialEdibleCount : 0;
         
@@ -202,7 +217,7 @@ class DeerManager {
         const sortedDeerIndices = this.deers
             .map((deer, index) => ({ deer, index }))
             .filter(item => item.deer.isAlive())
-            .sort((a, b) => b.deer.stamina - a.deer.stamina) // Fixed typo here (was a.wolf.stamina)
+            .sort((a, b) => b.deer.stamina - a.deer.stamina)
             .map(item => item.index);
         
         for (const deerIndex of sortedDeerIndices) {
@@ -215,8 +230,9 @@ class DeerManager {
                 continue;
             }
             
-            // DRAMATICALLY LOWER HUNGER THRESHOLD - Deer only need 25% of their hunger satisfied (temporary)
-            const massNeeded = deer.hunger * 0.25;
+            // Scale hunger based on the hunger factor (5 is baseline)
+            // A deer with hungerFactor=5 needs about 0.5 mass units
+            const massNeeded = deer.hunger * 0.1;
             
             // Calculate foragingSuccess - probability of finding trees
             const foragingSuccess = this.calculateForagingSuccess(
@@ -226,11 +242,12 @@ class DeerManager {
             );
             
             // Calculate how many trees the deer actually finds
-            const successRate = Math.max(0.5, foragingSuccess); // Use a high minimum success rate
-            
+            const successRate = Math.max(0.5, foragingSuccess); // Use a reasonable minimum success rate
+
+            const survivalThreshold = edibleTrees.length < this.getPopulationCount() * 3 ? 0.5 : 0.6;
             // Calculate trees needed and found
             const treesNeededForHunger = Math.max(1, Math.ceil(massNeeded / Math.max(0.01, avgTreeMass)));
-            const treesFound = Math.max(5, Math.ceil(treesNeededForHunger * successRate));
+            const treesFound = Math.max(1, Math.floor(treesNeededForHunger * successRate));
             
             // Log the probability calculations
             console.log(`DeerManager: Deer ${deerIndex} foraging - success prob: ${foragingSuccess.toFixed(2)}, ` +
@@ -240,7 +257,7 @@ class DeerManager {
             // Actual trees consumed is limited by what's available
             const treesConsumed = Math.min(
                 treesFound,
-                Math.floor(availableTrees.length * 0.5), // Increased to 50% of available trees
+                Math.ceil(availableTrees.length * 0.3), // Limit to 30% of available trees
                 availableTrees.length // Can't eat more trees than available
             );
             
@@ -258,8 +275,16 @@ class DeerManager {
                 // Remove from main tree array (mark as consumed)
                 const treeIndex = trees.indexOf(consumedTree);
                 if (treeIndex !== -1) {
-                    trees[treeIndex] = new Tree(0, 0, 0, 0, 0);
-                    massConsumed += consumedTree.mass;
+                    // Store the mass before marking it consumed
+                    const treeMass = consumedTree.mass;
+                    
+                    // Use the TreeManager method to mark it consumed
+                    treeManager.markAsConsumedByDeer(treeIndex);
+                    
+                    // Add the consumed mass to the deer's total
+                    massConsumed += treeMass;
+                    
+                    console.log(`DeerManager: Tree at index ${treeIndex} consumed by deer, mass: ${treeMass.toFixed(2)}`);
                     
                     // If we've accumulated enough mass, stop consuming trees
                     if (massConsumed >= massNeeded) {
@@ -269,12 +294,10 @@ class DeerManager {
             }
             
             // Determine if deer survives based on how much it ate compared to what it needed
-            // Add tolerance for floating point precision and be more lenient
-            const tolerance = 0.01; // Small tolerance to account for floating point precision
-            if (massConsumed >= (massNeeded - tolerance) || (massNeeded > 0 && massConsumed/massNeeded >= 0.90)) {
-                console.log(`DeerManager: Deer ${deerIndex} survived: ate ${treesConsumed} trees (${massConsumed.toFixed(2)}/${deer.hunger.toFixed(2)} mass, ${(massConsumed/deer.hunger*100).toFixed(0)}% of full hunger)`);
+            if (massConsumed >= (massNeeded * survivalThreshold)) {
+                console.log(`DeerManager: Deer ${deerIndex} survived...`);
             } else {
-                console.log(`DeerManager: Deer ${deerIndex} died: found only ${massConsumed.toFixed(2)}/${massNeeded.toFixed(2)} mass needed (${(massConsumed/massNeeded*100).toFixed(0)}% of required)`);
+                console.log(`DeerManager: Deer ${deerIndex} died...`);
                 this.killDeer(deerIndex);
             }
         }
@@ -288,27 +311,23 @@ class DeerManager {
         // No trees means no chance of finding food
         if (availableTreeCount === 0) return 0;
         
-        // Base probability depends on food availability
-        const availabilityFactor = availableTreeCount / Math.max(1, initialTreeCount);
+        // Base probability depends on food availability - more scarce = harder to find
+        const availabilityFactor = Math.sqrt(availableTreeCount / Math.max(1, initialTreeCount));
         
-        // Use stamina directly (assuming 0-10 scale from control panel)
-        // Handle the transition period when stamina values might still be large
-        const staminaFactor = (deer.stamina > 100) ? 
-            Math.min(1.0, deer.stamina / 15000) : // For old large values (transition period)
-            Math.min(1.0, deer.stamina / 10);     // For new 0-10 scale
+        // Use stamina directly (from 0-10 scale)
+        const staminaFactor = Math.min(1.0, deer.stamina / 10);
         
         // Age factor - prime-age deer have advantage
         const ageFactor = 1.0 - Math.abs(deer.age - 4) / 10; // Peak at age 4
         
-        // Combined probability - this represents the deer's ability to find food
-        // Higher base chance (0.5 instead of 0.3) to improve survival rates
+        // Combined probability - with more reasonable base rates
         let probability = 
-            (0.5 + 0.4 * availabilityFactor) * // Higher base chance + availability impact
-            (0.7 + 0.3 * staminaFactor) *      // Stamina boost
-            (0.8 + 0.2 * ageFactor);           // Age modifier
+            (0.5 + 0.3 * availabilityFactor) * // Base chance + availability impact
+            (0.6 + 0.4 * staminaFactor) *      // Stamina boost
+            (0.7 + 0.3 * ageFactor);           // Age modifier
         
         // Cap probability between 0 and 1
-        return Math.max(0, Math.min(1, probability));
+        return Math.max(0, Math.min(0.9, probability)); // Max 90% success
     }
     
 
@@ -349,11 +368,14 @@ class DeerManager {
         // Skip if factor is zero
         if (migrationFactor <= 0) return;
         
-        // The base number of migrating deer (can be adjusted with migrationFactor)
+        // Scale migration factor where 5 is "normal"
+        const scaledFactor = migrationFactor / 5.0;
+        
+        // The base number of migrating deer
         const baseMigrants = 1 + Math.floor(Math.random() * 2); // 1-2 deer by default
         
-        // Final number of migrants adjusted by the factor (higher factor = more migration)
-        const migrantCount = Math.max(0, Math.round(baseMigrants * migrationFactor));
+        // Final number of migrants adjusted by the factor
+        const migrantCount = Math.max(0, Math.round(baseMigrants * scaledFactor));
         
         if (migrantCount > 0) {
             console.log(`DeerManager: ${migrantCount} deer migrating into the ecosystem`);
@@ -372,8 +394,8 @@ class DeerManager {
                 
                 // Calculate properties based on age
                 tempDeer.mass = age > 4 ? 28 : age * 7;
-                tempDeer.hunger = age > 4 ? 2.0 : (age * 2.0 / 4.0);
-                tempDeer.stamina = this.calculateStamina(age, 10000.0); // Fixed stamina factor for migrants
+                tempDeer.hunger = age > 4 ? 5.0 : (age * 5.0 / 4.0); // Use 5 as baseline hunger
+                tempDeer.stamina = this.calculateStamina(age, 5.0); // Use 5 as baseline stamina
                 
                 this.deers[newPos] = tempDeer;
                 successfulMigrants++;
