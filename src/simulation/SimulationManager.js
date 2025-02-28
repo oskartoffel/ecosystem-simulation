@@ -40,21 +40,27 @@ class SimulationManager {
                 ageAvg: 30,
                 ageSigma: 20,
                 maturity: 10,
-                stressIndex: 90
+                stressLevel: 5,
+                reproductionFactor: 5,
+                edibleAge: 4
             },
             deer: {
                 initial: 20,
                 arraySize: 200,
                 maturity: 2,
-                staminaFactor: 5,
-                hungerFactor: 2.0
+                staminaFactor: 5.0,
+                hungerFactor: 5.0,
+                reproductionFactor: 5.0,
+                migrationFactor: 5.0
             },
             wolf: {
                 initial: 5,
                 arraySize: 100,
                 maturity: 2,
-                staminaFactor: 5,
-                hungerFactor: 1.0
+                staminaFactor: 5.0,
+                hungerFactor: 5.0,
+                reproductionFactor: 5.0,
+                migrationFactor: 5.0
             }
         };
 
@@ -111,8 +117,8 @@ class SimulationManager {
             this.treeManager.grow();
             this.treeManager.processAgeDeaths();
             this.treeManager.processConcurrence(this.config.tree.density);
-            this.treeManager.processStressDeaths(this.config.tree.stressLevel || 1);
-            this.treeManager.reproduce(this.config.tree.maturity);
+            this.treeManager.processStressDeaths(this.config.tree.stressLevel || 5);
+            this.treeManager.reproduce(this.config.tree.maturity, this.config.tree.reproductionFactor || 5);
             
             if (this.mode === 'normal' && i % 10 === 0) {
                 console.log(`Stabilization year ${i}: Tree count = ${this.treeManager.getPopulationCount()}`);
@@ -173,7 +179,7 @@ class SimulationManager {
             
             // Step 2: Process tree deaths in the correct order
             this.treeManager.processAgeDeaths();
-            this.treeManager.processStressDeaths(this.config.tree.stressLevel || 1);
+            this.treeManager.processStressDeaths(this.config.tree.stressLevel || 5);
             this.treeManager.processConcurrence(this.config.tree.density);
             
             // Step 3: Allow mature trees to reproduce
@@ -183,27 +189,35 @@ class SimulationManager {
             );
             
             // === DEER LIFECYCLE ===
-            // Process deer migration first
+            // Step 1: Process deer migration first (chance for new deer to enter)
             const deerPopulation = this.deerManager.getPopulationCount();
-            if (deerPopulation < 10) {  // Apply migration if population is low
+            // Apply migration with higher probability when population is low
+            if (deerPopulation < 10) {
                 this.deerManager.processMigration(this.config.deer.migrationFactor);
             } else {
-                // Still allow some migration with lower probability
+                // Still allow some migration with lower probability 
                 if (Math.random() < 0.2) {
+                    // Reduce migration by half when population is adequate
                     this.deerManager.processMigration(this.config.deer.migrationFactor * 0.5);
                 }
             }
             
+            // Step 2: Allow mature deer to reproduce
             this.deerManager.reproduce(
                 this.config.deer.maturity,
                 this.config.deer.reproductionFactor || 5.0
             );
             
+            // Step 3: Grow deer (age, update mass, hunger, stamina)
             this.deerManager.grow(
                 this.config.deer.staminaFactor,
                 this.config.deer.hungerFactor
             );
+            
+            // Step 4: Process natural deaths (age)
             this.deerManager.processNaturalDeaths();
+            
+            // Step 5: Process feeding (most critical part of deer lifecycle)
             this.deerManager.processFeeding(
                 this.treeManager.trees, 
                 this.config.tree.edibleAge || 4,
@@ -243,6 +257,8 @@ class SimulationManager {
             currentStats.trees.deaths = Math.max(0, initialTreeCount - finalTreeCount);
             currentStats.deer.deaths = Math.max(0, initialDeerCount - finalDeerCount);
             currentStats.wolves.deaths = Math.max(0, initialWolfCount - finalWolfCount);
+            
+            // Record tree consumption
             if (currentStats.trees.consumedByDeer > 0) {
                 console.log(`Trees consumed by deer this year: ${currentStats.trees.consumedByDeer}`);
             }
@@ -250,6 +266,7 @@ class SimulationManager {
             // Record statistics
             this.recordStats();
             
+            // Advance year and notify handlers
             this.year++;
             this.notifyEventHandlers();
             
@@ -295,6 +312,15 @@ class SimulationManager {
         
         if (prevWolfStats && !currentStats.wolves.deaths) {
             currentStats.wolves.deaths = Math.max(0, prevWolfStats.total - currentStats.wolves.total);
+        }
+        
+        // Record summary statistics
+        if (this.mode === 'normal' && this.year % 5 === 0) {
+            console.log(`Year ${this.year} Complete:
+                Trees: ${currentStats.trees.total} (Avg Age: ${currentStats.trees.averageAge.toFixed(1)}, Deaths: ${currentStats.trees.deaths || 0})
+                Deer: ${currentStats.deer.total} (Avg Age: ${currentStats.deer.averageAge.toFixed(1)}, Deaths: ${currentStats.deer.deaths || 0})
+                Wolves: ${currentStats.wolves.total} (Avg Age: ${currentStats.wolves.averageAge.toFixed(1)}, Deaths: ${currentStats.wolves.deaths || 0})`
+            );
         }
         
         this.stats.trees.push(currentStats.trees);
