@@ -225,28 +225,37 @@ class SimulationManager {
             );
             
             // === WOLF LIFECYCLE ===
+            // Step 1: Process wolf migration (chance for new wolves to enter)
             const wolfPopulation = this.wolfManager.getPopulationCount();
-            if (wolfPopulation < 3) {  // Apply migration if population is low
+            // Apply migration with higher probability when population is low
+            if (wolfPopulation < 3) {
                 this.wolfManager.processMigration(this.config.wolf.migrationFactor);
             } else {
-                // Still allow some migration with lower probability
-                if (Math.random() < 0.1) {
+                // Still allow some migration with lower probability 
+                if (Math.random() < 0.1) { // 10% chance for migration when population is healthy
+                    // Reduce migration rate for healthy populations
                     this.wolfManager.processMigration(this.config.wolf.migrationFactor * 0.3);
                 }
             }
-            
+
+            // Step 2: Allow mature wolves to reproduce
             this.wolfManager.reproduce(
                 this.config.wolf.maturity,
                 this.config.wolf.reproductionFactor || 5.0
             );
-            
+
+            // Step 3: Grow wolves (age, update mass, hunger, stamina)
             this.wolfManager.grow(
                 this.config.wolf.staminaFactor,
                 this.config.wolf.hungerFactor
             );
+
+            // Step 4: Process natural deaths (age)
             this.wolfManager.processNaturalDeaths();
+
+            // Step 5: Process hunting (prey on deer population)
             this.wolfManager.processHunting(this.deerManager);
-            
+                        
             // Calculate deaths
             const finalTreeCount = this.treeManager.getPopulationCount();
             const finalDeerCount = this.deerManager.getPopulationCount();
