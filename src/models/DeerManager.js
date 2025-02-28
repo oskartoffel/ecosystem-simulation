@@ -196,7 +196,7 @@ class DeerManager {
         return tree instanceof Tree && tree.position !== 0 && tree.age <= maxEdibleAge;
     }
 
-    processFeeding(trees, edibleAge = 2) {
+    processFeeding(trees, edibleAge = 4, treeManager) {
         // First, identify all edible trees
         const edibleTrees = trees.filter(tree => 
             tree instanceof Tree && tree.position !== 0 && tree.age <= edibleAge);
@@ -265,7 +265,7 @@ class DeerManager {
             
             // Remove consumed trees from environment
             for (let i = 0; i < treesConsumed && availableTrees.length > 0; i++) {
-                // Sort trees by mass and take the highest mass trees first (more efficient foraging)
+                // Sort trees by mass and take the highest mass trees first
                 availableTrees.sort((a, b) => b.mass - a.mass);
                 const consumedTree = availableTrees[0]; // Take highest mass tree
                 
@@ -275,16 +275,19 @@ class DeerManager {
                 // Remove from main tree array (mark as consumed)
                 const treeIndex = trees.indexOf(consumedTree);
                 if (treeIndex !== -1) {
-                    // Store the mass before marking it consumed
+                    // Store mass before removing tree
                     const treeMass = consumedTree.mass;
                     
-                    // Use the TreeManager method to mark it consumed
-                    treeManager.markAsConsumedByDeer(treeIndex);
+                    // REPLACE the direct tree assignment with this:
+                    if (treeManager) {
+                        // This is what was missing - explicitly mark the tree as consumed
+                        treeManager.markAsConsumedByDeer(treeIndex);
+                    } else {
+                        // Fallback if treeManager isn't provided
+                        trees[treeIndex] = new Tree(0, 0, 0, 0, 0);
+                    }
                     
-                    // Add the consumed mass to the deer's total
                     massConsumed += treeMass;
-                    
-                    console.log(`DeerManager: Tree at index ${treeIndex} consumed by deer, mass: ${treeMass.toFixed(2)}`);
                     
                     // If we've accumulated enough mass, stop consuming trees
                     if (massConsumed >= massNeeded) {

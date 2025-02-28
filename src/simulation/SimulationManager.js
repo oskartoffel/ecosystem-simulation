@@ -88,6 +88,9 @@ class SimulationManager {
             console.log("Starting initialization...");
         }
         
+        // Set tree manager in stabilization mode for initial planting
+        this.treeManager.setStabilizationMode(true);
+        
         // Initialize forest and let it stabilize
         this.treeManager.initialPlanting(
             this.config.tree.initial,
@@ -106,15 +109,19 @@ class SimulationManager {
         
         for (let i = 0; i < this.config.stabilizationYears; i++) {
             this.treeManager.grow();
+            this.treeManager.processAgeDeaths();
             this.treeManager.processConcurrence(this.config.tree.density);
             this.treeManager.processStressDeaths(this.config.tree.stressLevel || 1);
             this.treeManager.reproduce(this.config.tree.maturity);
-            this.treeManager.processAgeDeaths();
             
             if (this.mode === 'normal' && i % 10 === 0) {
                 console.log(`Stabilization year ${i}: Tree count = ${this.treeManager.getPopulationCount()}`);
             }
         }
+        
+        // IMPORTANT: Set tree manager to simulation mode to enable detailed logging
+        this.treeManager.setStabilizationMode(false);
+        console.log("Exiting stabilization mode, entering simulation mode");
         
         // Initialize animals
         if (this.mode === 'normal') {
@@ -160,17 +167,22 @@ class SimulationManager {
             const initialDeerCount = this.deerManager.getPopulationCount();
             const initialWolfCount = this.wolfManager.getPopulationCount();
     
-            // Tree lifecycle
-            this.treeManager.processConcurrence(this.config.tree.density);
+            // === TREE LIFECYCLE ===
+            // Step 1: Grow all trees by one year
             this.treeManager.grow();
+            
+            // Step 2: Process tree deaths in the correct order
             this.treeManager.processAgeDeaths();
             this.treeManager.processStressDeaths(this.config.tree.stressLevel || 1);
+            this.treeManager.processConcurrence(this.config.tree.density);
+            
+            // Step 3: Allow mature trees to reproduce
             this.treeManager.reproduce(
                 this.config.tree.maturity, 
                 this.config.tree.reproductionFactor || 5.0
             );
             
-            // Deer lifecycle
+            // === DEER LIFECYCLE ===
             // Process deer migration first
             const deerPopulation = this.deerManager.getPopulationCount();
             if (deerPopulation < 10) {  // Apply migration if population is low
@@ -194,10 +206,11 @@ class SimulationManager {
             this.deerManager.processNaturalDeaths();
             this.deerManager.processFeeding(
                 this.treeManager.trees, 
-                this.config.tree.edibleAge || 4
+                this.config.tree.edibleAge || 4,
+                this.treeManager 
             );
             
-            // Wolf lifecycle
+            // === WOLF LIFECYCLE ===
             const wolfPopulation = this.wolfManager.getPopulationCount();
             if (wolfPopulation < 3) {  // Apply migration if population is low
                 this.wolfManager.processMigration(this.config.wolf.migrationFactor);
@@ -230,6 +243,9 @@ class SimulationManager {
             currentStats.trees.deaths = Math.max(0, initialTreeCount - finalTreeCount);
             currentStats.deer.deaths = Math.max(0, initialDeerCount - finalDeerCount);
             currentStats.wolves.deaths = Math.max(0, initialWolfCount - finalWolfCount);
+            if (currentStats.trees.consumedByDeer > 0) {
+                console.log(`Trees consumed by deer this year: ${currentStats.trees.consumedByDeer}`);
+            }
             
             // Record statistics
             this.recordStats();
@@ -286,7 +302,6 @@ class SimulationManager {
         this.stats.wolves.push(currentStats.wolves);
     }
     
-
     clearStats() {
         Object.keys(this.stats).forEach(key => {
             this.stats[key] = [];
