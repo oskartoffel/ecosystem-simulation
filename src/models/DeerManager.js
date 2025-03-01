@@ -380,20 +380,27 @@ class DeerManager {
                     // Consume only what's needed
                     massConsumed += massStillNeeded;
                     
-                    // IMPORTANT: Remove tree if it's small or if deer ate most of it
-                    // This simulates deer damaging small trees beyond recovery
-                    if (tree.age <= 2 || tree.mass < 2.0 || massStillNeeded > tree.mass * 0.7) {
-                        // Small tree or mostly consumed - remove completely
+                    // Calculate percentage of tree consumed
+                    const percentConsumed = massStillNeeded / tree.mass;
+                    
+                    // SIMPLIFIED CONDITION: If deer eats 30% or more of tree, tree dies
+                    // Also, if tree is young (age <= 4) and deer eats any of it, tree dies
+                    if (percentConsumed >= 0.3 || tree.age <= 4) {
+                        // Tree is killed
                         if (treeManager) {
                             treeManager.markAsConsumedByDeer(treeIndex);
+                            console.log(`REH-DEBUG: Tree at position ${treeIndex} marked as consumed (age: ${tree.age.toFixed(1)}, ${(percentConsumed*100).toFixed(1)}% eaten)`);
                         } else {
                             trees[treeIndex] = new Tree(0, 0, 0, 0, 0);
+                            console.log(`REH-DEBUG: Tree at position ${treeIndex} directly consumed (no tree manager available)`);
                         }
                         
                         // Remove from available pool
                         availableTrees.splice(i, 1);
                         i--; // Adjust index since we removed an item
                         treesCompletelyConsumed++;
+                    } else {
+                        console.log(`REH-DEBUG: Tree survived partial consumption (age: ${tree.age.toFixed(1)}, only ${(percentConsumed*100).toFixed(1)}% eaten)`);
                     }
                     
                     // Deer's hunger is satisfied, stop consuming
@@ -405,8 +412,10 @@ class DeerManager {
                     // Remove the completely consumed tree
                     if (treeManager) {
                         treeManager.markAsConsumedByDeer(treeIndex);
+                        console.log(`REH-DEBUG: Small tree at position ${treeIndex} completely consumed (age: ${tree.age.toFixed(1)}, mass: ${tree.mass.toFixed(2)})`);
                     } else {
                         trees[treeIndex] = new Tree(0, 0, 0, 0, 0);
+                        console.log(`REH-DEBUG: Small tree consumed directly (no tree manager)`);
                     }
                     
                     // Remove from available pool

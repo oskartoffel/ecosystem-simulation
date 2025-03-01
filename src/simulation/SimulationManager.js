@@ -303,7 +303,7 @@ class SimulationManager {
 
     recordStats() {
         const currentStats = this.getCurrentStats();
-        
+        console.log(`SIM-DEBUG: Tree stats - total: ${currentStats.trees.total}, consumedByDeer: ${currentStats.trees.consumedByDeer}`);
         // Track deaths from previous cycle to current
         const prevTreeStats = this.stats.trees.length > 0 ? this.stats.trees[this.stats.trees.length - 1] : null;
         const prevDeerStats = this.stats.deer.length > 0 ? this.stats.deer[this.stats.deer.length - 1] : null;

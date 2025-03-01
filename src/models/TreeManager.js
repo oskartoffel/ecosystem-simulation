@@ -281,14 +281,15 @@ class TreeManager {
             // Store age and position for logging
             const age = this.trees[index].age;
             const position = this.trees[index].position;
+            const mass = this.trees[index].mass;
             
             // Clear the tree
             this.trees[index] = new Tree(0, 0, 0, 0, 0);
             this.consumedByDeer++;
             
-            if (!this.isStabilizing) {
-                console.log(`BAUM: Tree at position ${position} (age: ${age.toFixed(1)}) was consumed by deer`);
-            }
+            // Always log this, even in stabilization mode
+            console.log(`BAUM-DEBUG: Tree at position ${position} (age: ${age.toFixed(1)}, mass: ${mass.toFixed(2)}) was consumed by deer`);
+            console.log(`BAUM-DEBUG: Incremented consumedByDeer counter to ${this.consumedByDeer}`);
         }
     }
 
@@ -397,8 +398,13 @@ class TreeManager {
         // Calculate age distribution
         const ageDistribution = this.getAgeDistribution();
         
+        // Store the current consumedByDeer value
+        const currentConsumedByDeer = this.consumedByDeer;
+        
         // Calculate total deaths including consumption by deer
-        const totalDeaths = this.simulationDeaths + this.consumedByDeer;
+        const totalDeaths = this.simulationDeaths + currentConsumedByDeer;
+
+        console.log(`BAUM-DEBUG: In getStatistics, consumedByDeer= ${this.consumedByDeer}`);
         
         // Prepare statistics object
         const stats = { 
@@ -408,7 +414,7 @@ class TreeManager {
             stressDeaths: this.stressDeaths,
             ageDeaths: this.ageDeaths,
             concurrenceDeaths: this.concurrenceDeaths,
-            consumedByDeer: this.consumedByDeer,
+            consumedByDeer: currentConsumedByDeer,  // Use the stored value
             totalDeaths: totalDeaths, // New property with comprehensive death count
             youngTrees: youngTrees, 
             averageHeight: aliveTrees.reduce((sum, tree) => sum + tree.height, 0) / aliveTrees.length || 0,
@@ -419,12 +425,15 @@ class TreeManager {
         console.log(`BAUM: Statistics - Population=${stats.total}, ` +
                      `Young Trees=${youngTrees}, ` + 
                      `Avg Age=${stats.averageAge.toFixed(1)}, ` + 
-                     `Deaths=${totalDeaths} (Natural=${this.simulationDeaths}, Consumed=${this.consumedByDeer})`);
+                     `Deaths=${totalDeaths} (Natural=${this.simulationDeaths}, Consumed=${currentConsumedByDeer})`);
         
-        // Store the current consumedByDeer value before resetting
-        const currentConsumed = this.consumedByDeer;
+        // Debug logging
+        console.log(`BAUM-DEBUG: Stats object created with consumedByDeer= ${stats.consumedByDeer}`);
         
-        // Reset consumption counter for next cycle
+        // More debug logging
+        console.log(`BAUM-DEBUG: About to reset consumedByDeer counter from ${this.consumedByDeer} to 0 ...`);
+        
+        // Reset counter
         this.consumedByDeer = 0;
         
         return stats; 
