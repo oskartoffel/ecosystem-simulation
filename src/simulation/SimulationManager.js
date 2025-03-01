@@ -161,7 +161,7 @@ class SimulationManager {
             console.log("Initialization complete. Initial population stats:", initialStats);
         }
     }
-
+    
     simulateYear() {
         if (this.mode === 'normal') {
             console.group(`Year ${this.year}`);
@@ -255,7 +255,7 @@ class SimulationManager {
 
             // Step 5: Process hunting (prey on deer population)
             this.wolfManager.processHunting(this.deerManager);
-                        
+            
             // Calculate deaths
             const finalTreeCount = this.treeManager.getPopulationCount();
             const finalDeerCount = this.deerManager.getPopulationCount();
@@ -263,14 +263,13 @@ class SimulationManager {
             
             // Add death counts to current stats
             const currentStats = this.getCurrentStats();
-            currentStats.trees.deaths = Math.max(0, initialTreeCount - finalTreeCount);
+            
+            // We no longer need this manual calculation for trees since TreeManager now tracks all death causes
+            // including consumption by deer, and returns a totalDeaths property
+            // currentStats.trees.deaths = Math.max(0, initialTreeCount - finalTreeCount);
+            
             currentStats.deer.deaths = Math.max(0, initialDeerCount - finalDeerCount);
             currentStats.wolves.deaths = Math.max(0, initialWolfCount - finalWolfCount);
-            
-            // Record tree consumption
-            if (currentStats.trees.consumedByDeer > 0) {
-                console.log(`Trees consumed by deer this year: ${currentStats.trees.consumedByDeer}`);
-            }
             
             // Record statistics
             this.recordStats();

@@ -78,7 +78,7 @@ const DebugInterface = () => {
 
   const exportToCsv = () => {
     const csvContent = "data:text/csv;charset=utf-8," + 
-      "Year,Trees,Deer,Wolves,TreeAvgAge,DeerAvgAge,WolfAvgAge,TreeDeaths,DeerDeaths,WolfDeaths,YoungTrees\n" +
+      "Year,Trees,Deer,Wolves,TreeAvgAge,DeerAvgAge,WolfAvgAge,TreeDeaths,TreeConsumed,TreeStressDeaths,TreeAgeDeaths,TreeConcurrenceDeaths,DeerDeaths,WolfDeaths,YoungTrees\n" +
       simulationData
         .filter(row => row.phase !== 'stabilization') // Filter out stabilization years
         .map(row => {
@@ -90,7 +90,11 @@ const DebugInterface = () => {
             row.treeAvgAge?.toFixed(2) || 0,
             row.deerAvgAge?.toFixed(2) || 0,
             row.wolfAvgAge?.toFixed(2) || 0,
-            row.treeDeaths || 0,
+            row.treeDeaths || 0,            // Total tree deaths (includes consumed)
+            row.treeConsumedByDeer || 0,    // Trees eaten by deer
+            row.treeStressDeaths || 0,      // Tree stress deaths
+            row.treeAgeDeaths || 0,         // Tree age deaths
+            row.treeConcurrenceDeaths || 0, // Tree concurrence deaths
             row.deerDeaths || 0,
             row.wolfDeaths || 0,
             row.youngTrees || 0
@@ -239,7 +243,11 @@ const DebugInterface = () => {
           treeAvgAge: yearStats.trees.averageAge,
           deerAvgAge: yearStats.deer.averageAge,
           wolfAvgAge: yearStats.wolves.averageAge,
-          treeDeaths: yearStats.trees.deaths || 0,
+          treeDeaths: yearStats.trees.deaths || 0,                // Total deaths including eaten by deer
+          treeConsumedByDeer: yearStats.trees.consumedByDeer || 0, // Trees eaten by deer
+          treeStressDeaths: yearStats.trees.stressDeaths || 0,     // Tree stress deaths
+          treeAgeDeaths: yearStats.trees.ageDeaths || 0,           // Tree age deaths
+          treeConcurrenceDeaths: yearStats.trees.concurrenceDeaths || 0, // Tree concurrence deaths
           deerDeaths: yearStats.deer.deaths || 0,
           wolfDeaths: yearStats.wolves.deaths || 0,
           youngTrees: yearStats.trees.youngTrees || 0,
@@ -255,7 +263,7 @@ const DebugInterface = () => {
         
         if (year % 5 === 0) {
           addLog(`Year ${year} Complete:
-            Trees: ${yearStats.trees.total} (Avg Age: ${yearStats.trees.averageAge.toFixed(1)}, Deaths: ${yearStats.trees.deaths || 0})
+            Trees: ${yearStats.trees.total} (Avg Age: ${yearStats.trees.averageAge.toFixed(1)}, Deaths: ${yearStats.trees.deaths || 0}, Consumed: ${yearStats.trees.consumedByDeer || 0})
             Deer: ${yearStats.deer.total} (Avg Age: ${yearStats.deer.averageAge.toFixed(1)}, Deaths: ${yearStats.deer.deaths || 0})
             Wolves: ${yearStats.wolves.total} (Avg Age: ${yearStats.wolves.averageAge.toFixed(1)}, Deaths: ${yearStats.wolves.deaths || 0})`
           );
@@ -452,19 +460,30 @@ const DebugInterface = () => {
                 <p>Total: {simulationData[currentYear].trees}</p>
                 <p>Young: {simulationData[currentYear].youngTrees || 0}</p>
                 <p>Avg Age: {simulationData[currentYear].treeAvgAge?.toFixed(1) || 0}</p>
+                <div className="mt-2 pt-2 border-t border-green-200">
+                  <p className="font-semibold">Death Breakdown:</p>
+                  <p>Total Deaths: {simulationData[currentYear].treeDeaths || 0}</p>
+                  <p>• Consumed by Deer: {simulationData[currentYear].treeConsumedByDeer || 0}</p>
+                  <p>• Age Deaths: {simulationData[currentYear].treeAgeDeaths || 0}</p>
+                  <p>• Stress Deaths: {simulationData[currentYear].treeStressDeaths || 0}</p>
+                  <p>• Concurrence: {simulationData[currentYear].treeConcurrenceDeaths || 0}</p>
+                </div>
               </div>
               <div className="bg-orange-50 p-4 rounded-lg">
                 <h3 className="font-bold text-orange-800">Deer</h3>
                 <p>Population: {simulationData[currentYear].deer}</p>
                 <p>Avg Age: {simulationData[currentYear].deerAvgAge?.toFixed(1) || 0}</p>
+                <p>Deaths: {simulationData[currentYear].deerDeaths || 0}</p>
               </div>
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h3 className="font-bold text-gray-800">Wolves</h3>
                 <p>Population: {simulationData[currentYear].wolves}</p>
                 <p>Avg Age: {simulationData[currentYear].wolfAvgAge?.toFixed(1) || 0}</p>
+                <p>Deaths: {simulationData[currentYear].wolfDeaths || 0}</p>
               </div>
             </div>
           )}
+
 
           {/* Download buttons */}
           <div className="flex flex-wrap gap-3">

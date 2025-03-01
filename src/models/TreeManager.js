@@ -397,26 +397,32 @@ class TreeManager {
         // Calculate age distribution
         const ageDistribution = this.getAgeDistribution();
         
+        // Calculate total deaths including consumption by deer
+        const totalDeaths = this.simulationDeaths + this.consumedByDeer;
+        
         // Prepare statistics object
         const stats = { 
             total: aliveTrees.length, 
             averageAge: aliveTrees.reduce((sum, tree) => sum + tree.age, 0) / aliveTrees.length || 0, 
-            deaths: this.simulationDeaths,
+            deaths: totalDeaths, // Now includes trees consumed by deer
             stressDeaths: this.stressDeaths,
             ageDeaths: this.ageDeaths,
             concurrenceDeaths: this.concurrenceDeaths,
+            consumedByDeer: this.consumedByDeer,
+            totalDeaths: totalDeaths, // New property with comprehensive death count
             youngTrees: youngTrees, 
             averageHeight: aliveTrees.reduce((sum, tree) => sum + tree.height, 0) / aliveTrees.length || 0,
-            consumedByDeer: this.consumedByDeer,
             ageDistribution: ageDistribution
         }; 
         
-        // Log basic statistics
+        // Log basic statistics with complete death information
         console.log(`BAUM: Statistics - Population=${stats.total}, ` +
                      `Young Trees=${youngTrees}, ` + 
                      `Avg Age=${stats.averageAge.toFixed(1)}, ` + 
-                     `Deaths=${this.simulationDeaths}, ` + 
-                     `Consumed by Deer=${this.consumedByDeer}`);
+                     `Deaths=${totalDeaths} (Natural=${this.simulationDeaths}, Consumed=${this.consumedByDeer})`);
+        
+        // Store the current consumedByDeer value before resetting
+        const currentConsumed = this.consumedByDeer;
         
         // Reset consumption counter for next cycle
         this.consumedByDeer = 0;

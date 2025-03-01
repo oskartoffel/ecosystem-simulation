@@ -109,6 +109,11 @@ const EcosystemVisualization = () => {
         year,
         trees: yearStats.trees.total,
         youngTrees: yearStats.trees.youngTrees || 0,
+        treeDeaths: yearStats.trees.deaths || 0,                // Total deaths including eaten by deer
+        treeConsumedByDeer: yearStats.trees.consumedByDeer || 0, // Trees eaten by deer
+        treeStressDeaths: yearStats.trees.stressDeaths || 0,     // Tree stress deaths
+        treeAgeDeaths: yearStats.trees.ageDeaths || 0,           // Tree age deaths
+        treeConcurrenceDeaths: yearStats.trees.concurrenceDeaths || 0, // Tree concurrence deaths
         deer: yearStats.deer.total,
         wolves: yearStats.wolves.total,
         treeAvgAge: yearStats.trees.averageAge,
@@ -170,12 +175,14 @@ const EcosystemVisualization = () => {
 
   const downloadCSV = () => {
     const csvContent = "data:text/csv;charset=utf-8," + 
-      "Year,Trees,YoungTrees,Deer,Wolves,TreeAvgAge,DeerAvgAge,WolfAvgAge\n" +
+      "Year,Trees,YoungTrees,TreeDeaths,TreeConsumedByDeer,Deer,Wolves,TreeAvgAge,DeerAvgAge,WolfAvgAge\n" +
       simulationData.filter(row => row.trees !== null).map(row => {
         return [
           row.year,
           row.trees,
           row.youngTrees || 0,
+          row.treeDeaths || 0,            // Total tree deaths
+          row.treeConsumedByDeer || 0,    // Trees eaten by deer
           row.deer,
           row.wolves,
           row.treeAvgAge?.toFixed(2) || 0,
@@ -388,16 +395,26 @@ const EcosystemVisualization = () => {
               <p>Total: {simulationData[currentYear].trees}</p>
               <p>Young: {simulationData[currentYear].youngTrees || 0}</p>
               <p>Avg Age: {simulationData[currentYear].treeAvgAge?.toFixed(1) || 0}</p>
+              <div className="mt-2 pt-2 border-t border-green-200">
+                <p className="font-semibold">Death Breakdown:</p>
+                <p>Total Deaths: {simulationData[currentYear].treeDeaths || 0}</p>
+                <p>• Consumed by Deer: {simulationData[currentYear].treeConsumedByDeer || 0}</p>
+                <p>• Age Deaths: {simulationData[currentYear].treeAgeDeaths || 0}</p>
+                <p>• Stress Deaths: {simulationData[currentYear].treeStressDeaths || 0}</p>
+                <p>• Concurrence: {simulationData[currentYear].treeConcurrenceDeaths || 0}</p>
+              </div>
             </div>
             <div className="bg-orange-50 p-4 rounded-lg">
               <h3 className="font-bold text-orange-800">Deer</h3>
               <p>Population: {simulationData[currentYear].deer}</p>
               <p>Avg Age: {simulationData[currentYear].deerAvgAge?.toFixed(1) || 0}</p>
+              <p>Deaths: {simulationData[currentYear].deerDeaths || 0}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-bold text-gray-800">Wolves</h3>
               <p>Population: {simulationData[currentYear].wolves}</p>
               <p>Avg Age: {simulationData[currentYear].wolfAvgAge?.toFixed(1) || 0}</p>
+              <p>Deaths: {simulationData[currentYear].wolfDeaths || 0}</p>
             </div>
           </div>
           
