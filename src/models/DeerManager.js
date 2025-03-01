@@ -48,7 +48,11 @@ class DeerManager {
             
             // Calculate properties based on age
             tempDeer.mass = age > 4 ? 28 : age * 7;
+            
+            // FIXED: Scale hunger based on hunger factor more realistically
             tempDeer.hunger = age > 4 ? hunger : (age * hunger / 4.0);
+            
+            // FIXED: Young deer should have lower stamina compared to adults
             tempDeer.stamina = this.calculateStamina(age, staminaFactor);
 
             this.deers[newPos] = tempDeer;
@@ -73,11 +77,15 @@ class DeerManager {
         // Apply non-linear scaling (1=very weak, 5=normal, 10=very strong)
         const scaledFactor = Math.pow(normalizedFactor / 5.0, 1.5);
         
-        // Base curve that peaks at age 4-5 (prime age for deer)
+        // FIXED: Adjusted age curve to give young deer lower stamina
+        // Peak at age 4-5, but lower for very young deer
         const baseCurve = Math.max(0, 10 - Math.pow(age - 4.5, 2) / 2.5);
         
+        // Further reduce stamina for very young deer (under 2 years)
+        const youthPenalty = age < 2 ? 0.5 : 1.0;
+        
         // Apply stamina factor with non-linear impact
-        return Math.min(10, baseCurve * scaledFactor);
+        return Math.min(10, baseCurve * scaledFactor * youthPenalty);
     }
 
     /**
@@ -176,9 +184,10 @@ class DeerManager {
      * @param {number} reproductionFactor - Factor affecting reproduction rate (1-10 scale)
      */
     reproduce(maturity, reproductionFactor = 5.0) {
+        // FIXED: Improved reproduction scaling to make high values more impactful
         // Scale reproduction factor where 5 is "normal"
-        // Apply non-linear scaling (1=very low, 5=normal, 10=very high reproduction)
-        const scaledReproFactor = Math.pow(reproductionFactor / 5.0, 1.8);
+        // Non-linear scaling: 1=very low, 5=normal, 10=much higher reproduction
+        const scaledReproFactor = Math.pow(reproductionFactor / 5.0, 2.5);
         
         const aliveDeer = this.deers.filter(deer => deer.isAlive());
         const matureDeer = aliveDeer.filter(deer => deer.age >= maturity);
@@ -188,24 +197,30 @@ class DeerManager {
         // Keep track of potential births
         let potentialBirths = 0;
         
-        // Calculate new births based on individual deer reproduction chances
+        // FIXED: Improved reproduction calculation for better population dynamics
         matureDeer.forEach(deer => {
+            // Population density has less impact at mid-range
             const populationDensity = aliveDeer.length / this.deers.length;
+            const densityFactor = 1 - (Math.pow(populationDensity, 1.5) * 0.7);
             
-            // FIXED: Increased base probability and made density less impactful
+            // FIXED: Higher base probability and stronger reproduction factor impact
             const reproductionProbability = 
-                0.4 *  // Increased base probability from 0.2 to 0.4
-                (1 - populationDensity * 0.5) *  // Less density impact
+                0.5 *  // Increased base probability from 0.4 to 0.5
+                densityFactor *  // Improved density impact
                 (deer.stamina / 10) *  // Higher stamina increases reproduction chance
                 (1 / (1 + Math.exp(-deer.age + maturity))) *  // Probability peaks around maturity
-                scaledReproFactor;  // Apply scaled reproduction factor
+                scaledReproFactor;  // Apply scaled reproduction factor - now more impactful
+            
+            // FIXED: Apply a direct multiplier for high reproduction factor
+            const finalProbability = reproductionFactor >= 8 ? 
+                reproductionProbability * 1.5 : reproductionProbability;
             
             // Debug the probability for a small sample
             if (Math.random() < 0.1) { // 10% sample
-                console.log(`REH: Deer ${deer.nr} reproduction chance: ${(reproductionProbability * 100).toFixed(2)}% (age: ${deer.age.toFixed(1)}, stamina: ${deer.stamina.toFixed(1)})`);
+                console.log(`REH: Deer ${deer.nr} reproduction chance: ${(finalProbability * 100).toFixed(2)}% (age: ${deer.age.toFixed(1)}, stamina: ${deer.stamina.toFixed(1)})`);
             }
     
-            if (Math.random() < reproductionProbability) {
+            if (Math.random() < finalProbability) {
                 potentialBirths++;
             }
         });
@@ -221,7 +236,8 @@ class DeerManager {
                 break; // No more space available
             }
             
-            const newDeer = new Deer(newPos + 1, 0, 1, 1, 10);
+            // FIXED: Give newborn deer appropriate initial values
+            const newDeer = new Deer(newPos + 1, 0, 1, 1, 5); // Lower initial stamina
             this.deers[newPos] = newDeer;
             actualBirths++;
         }
@@ -250,45 +266,51 @@ class DeerManager {
     }
 
     /**
-     * Find a young tree for a deer to eat
-     * @param {Array} trees - Array of trees
-     * @param {number} maxEdibleAge - Maximum age of trees that can be eaten
-     * @returns {Tree|null} - Found tree or null if none available
-     */
-    findYoungTree(trees, maxEdibleAge = 2) {
-        // First check if any young trees exist to avoid wasting attempts
-        const edibleTrees = trees.filter(tree => 
-            tree instanceof Tree && tree.position !== 0 && tree.age <= maxEdibleAge);
-        
-        if (edibleTrees.length === 0) {
-            return null; // No edible trees available
-        }
-        
-        // Select a random edible tree directly from the filtered list
-        const randomIndex = Math.floor(Math.random() * edibleTrees.length);
-        return edibleTrees[randomIndex];
-    }
-    
-    /**
-     * Check if a tree is edible
-     * @param {Tree} tree - Tree to check
-     * @param {number} maxEdibleAge - Maximum age of trees that can be eaten
-     * @returns {boolean} - Whether the tree is edible
-     */
-    isTreeEdible(tree, maxEdibleAge) {
-        return tree instanceof Tree && tree.position !== 0 && tree.age <= maxEdibleAge;
-    }
-
-    /**
      * Process feeding for all deer
      * @param {Array} trees - Array of trees
      * @param {number} edibleAge - Maximum age of trees that deer can eat
      * @param {TreeManager} treeManager - TreeManager instance for tree interaction
      */
     processFeeding(trees, edibleAge = 4, treeManager) {
+        // DEBUG: Log the actual edibleAge value being used
+        console.log(`REH-DEBUG: Processing feeding with edibleAge=${edibleAge}`);
+        
+        // CLARIFICATION: edibleAge is the maximum age of trees that deer can eat
+        // Any tree with age <= edibleAge can be consumed by deer
+        
         // First, identify all edible trees
         const edibleTrees = trees.filter(tree => 
             tree instanceof Tree && tree.position !== 0 && tree.age <= edibleAge);
+        
+        // DEBUG: Log age distribution of all trees and edible trees
+        const allTreeAges = trees
+            .filter(tree => tree instanceof Tree && tree.position !== 0)
+            .map(tree => tree.age);
+        
+        console.log(`REH-DEBUG: Tree age distribution - Total trees: ${allTreeAges.length}`);
+        
+        if (allTreeAges.length > 0) {
+            const ageGroups = {
+                'age 0-1': 0,
+                'age 1-2': 0,
+                'age 2-3': 0,
+                'age 3-4': 0,
+                'age 4-5': 0,
+                'age 5+': 0
+            };
+            
+            allTreeAges.forEach(age => {
+                if (age <= 1) ageGroups['age 0-1']++;
+                else if (age <= 2) ageGroups['age 1-2']++;
+                else if (age <= 3) ageGroups['age 2-3']++;
+                else if (age <= 4) ageGroups['age 3-4']++;
+                else if (age <= 5) ageGroups['age 4-5']++;
+                else ageGroups['age 5+']++;
+            });
+            
+            console.log(`REH-DEBUG: Tree ages: ${JSON.stringify(ageGroups)}`);
+            console.log(`REH-DEBUG: Edible trees (age <= ${edibleAge}): ${edibleTrees.length} trees`);
+        }
         
         const totalEdibleMass = edibleTrees.reduce((sum, tree) => sum + tree.mass, 0);
         const initialEdibleCount = edibleTrees.length;
@@ -323,8 +345,9 @@ class DeerManager {
                 continue;
             }
             
-            // Scale hunger based on the hunger factor (5 is baseline)
-            const massNeeded = deer.hunger * 0.05;
+            // FIXED: Scale hunger based on the hunger factor much more significantly
+            // This makes hunger level 1-10 scale have a dramatic effect on food needed
+            const massNeeded = deer.hunger * 0.2 * Math.pow(deer.hunger / 5, 0.5);
             
             // Calculate foraging success - probability of finding trees
             const foragingSuccess = this.calculateForagingSuccess(
@@ -335,21 +358,31 @@ class DeerManager {
             
             // Calculate how many trees the deer actually finds
             const successRate = Math.max(0.5, foragingSuccess);
-            const survivalThreshold = edibleTrees.length < this.getPopulationCount() * 3 ? 0.4 : 0.5;
+            
+            // FIXED: Made survival threshold depend on hunger factor
+            // Lower hunger factor (1-3) = easier survival at 60% of needed mass
+            // Medium hunger factor (4-7) = need 70% of needed mass
+            // High hunger factor (8-10) = need 80% of needed mass
+            const survivalThreshold = deer.hunger <= 3 ? 0.6 : 
+                                    deer.hunger <= 7 ? 0.7 : 0.8;
             
             // Calculate trees needed for reference
             const treesNeededForHunger = Math.max(1, Math.ceil(massNeeded / Math.max(0.01, avgTreeMass)));
-            const treesFound = Math.max(1, Math.floor(treesNeededForHunger * successRate));
+            
+            // FIXED: Trees found depends on stamina and foraging success
+            // Higher stamina and success rate means more trees found
+            const treesFound = Math.max(1, Math.floor(treesNeededForHunger * successRate * (deer.stamina / 10)));
             
             // Log the foraging attempt
             console.log(`REH: Deer ${deerIndex} foraging - success prob: ${foragingSuccess.toFixed(2)}, ` +
                         `success rate: ${successRate.toFixed(2)}, ` +
+                        `mass needed: ${massNeeded.toFixed(2)}, ` +
                         `trees needed: ${treesNeededForHunger}, ` +
                         `trees found: ${treesFound}, ` +
                         `stamina: ${deer.stamina.toFixed(1)}, ` +
-                        `age: ${deer.age.toFixed(1)}`);
+                        `hunger factor: ${deer.hunger.toFixed(1)}`);
             
-            // NEW: Improved efficient feeding approach
+            // FIXED: Improved efficient feeding approach
             let massConsumed = 0;
             const treesToConsume = Math.min(
                 treesFound,
@@ -362,6 +395,7 @@ class DeerManager {
             
             // Track trees completely consumed
             let treesCompletelyConsumed = 0;
+            let treesPartiallyConsumed = 0;
             
             // First try to consume only what's needed from available trees
             for (let i = 0; i < treesToConsume && massConsumed < massNeeded; i++) {
@@ -375,24 +409,31 @@ class DeerManager {
                 // How much mass does the deer still need?
                 const massStillNeeded = massNeeded - massConsumed;
                 
-                // If tree has enough mass to satisfy the deer's remaining need
-                if (tree.mass >= massStillNeeded) {
-                    // Consume only what's needed
-                    massConsumed += massStillNeeded;
-                    
-                    // Calculate percentage of tree consumed
-                    const percentConsumed = massStillNeeded / tree.mass;
-                    
-                    // SIMPLIFIED CONDITION: If deer eats 30% or more of tree, tree dies
-                    // Also, if tree is young (age <= 4) and deer eats any of it, tree dies
-                    if (percentConsumed >= 0.3 || tree.age <= 4) {
+                // DEBUG: Log the tree being considered
+            console.log(`REH-DEBUG: Considering tree: age=${tree.age.toFixed(1)}, mass=${tree.mass.toFixed(2)}, edible=${tree.age <= edibleAge}`);
+            
+            // If tree has enough mass to satisfy the deer's remaining need
+            if (tree.mass >= massStillNeeded) {
+                // Consume only what's needed
+                massConsumed += massStillNeeded;
+                
+                // Calculate percentage of tree consumed
+                const percentConsumed = massStillNeeded / tree.mass;
+                
+                // DEBUG: Log consumption details
+                console.log(`REH-DEBUG: Consuming ${(percentConsumed*100).toFixed(1)}% of tree age=${tree.age.toFixed(1)}`);
+                
+                // FIXED: More realistic tree consumption rules
+                // If deer eats 30% or more of tree, tree dies
+                // Also, if tree is very young (age <= 2) and deer eats any of it, tree dies
+                if (percentConsumed >= 0.3 || tree.age <= 2) {
                         // Tree is killed
                         if (treeManager) {
                             treeManager.markAsConsumedByDeer(treeIndex);
-                            console.log(`REH-DEBUG: Tree at position ${treeIndex} marked as consumed (age: ${tree.age.toFixed(1)}, ${(percentConsumed*100).toFixed(1)}% eaten)`);
+                            console.log(`REH: Tree at position ${treeIndex} marked as consumed (age: ${tree.age.toFixed(1)}, ${(percentConsumed*100).toFixed(1)}% eaten)`);
                         } else {
                             trees[treeIndex] = new Tree(0, 0, 0, 0, 0);
-                            console.log(`REH-DEBUG: Tree at position ${treeIndex} directly consumed (no tree manager available)`);
+                            console.log(`REH: Tree at position ${treeIndex} directly consumed (no tree manager available)`);
                         }
                         
                         // Remove from available pool
@@ -400,7 +441,8 @@ class DeerManager {
                         i--; // Adjust index since we removed an item
                         treesCompletelyConsumed++;
                     } else {
-                        console.log(`REH-DEBUG: Tree survived partial consumption (age: ${tree.age.toFixed(1)}, only ${(percentConsumed*100).toFixed(1)}% eaten)`);
+                        console.log(`REH: Tree survived partial consumption (age: ${tree.age.toFixed(1)}, only ${(percentConsumed*100).toFixed(1)}% eaten)`);
+                        treesPartiallyConsumed++;
                     }
                     
                     // Deer's hunger is satisfied, stop consuming
@@ -409,13 +451,16 @@ class DeerManager {
                     // Tree doesn't have enough mass - consume it entirely
                     massConsumed += tree.mass;
                     
+                    // DEBUG: Log the full consumption
+                    console.log(`REH-DEBUG: Completely consuming tree age=${tree.age.toFixed(1)}, mass=${tree.mass.toFixed(2)}`);
+                    
                     // Remove the completely consumed tree
                     if (treeManager) {
                         treeManager.markAsConsumedByDeer(treeIndex);
-                        console.log(`REH-DEBUG: Small tree at position ${treeIndex} completely consumed (age: ${tree.age.toFixed(1)}, mass: ${tree.mass.toFixed(2)})`);
+                        console.log(`REH: Small tree at position ${treeIndex} completely consumed (age: ${tree.age.toFixed(1)}, mass: ${tree.mass.toFixed(2)})`);
                     } else {
                         trees[treeIndex] = new Tree(0, 0, 0, 0, 0);
-                        console.log(`REH-DEBUG: Small tree consumed directly (no tree manager)`);
+                        console.log(`REH: Small tree consumed directly (no tree manager)`);
                     }
                     
                     // Remove from available pool
@@ -427,10 +472,10 @@ class DeerManager {
             
             // Determine if deer survives based on how much it ate compared to what it needed
             if (massConsumed >= (massNeeded * survivalThreshold)) {
-                console.log(`REH: Deer ${deerIndex} survived by consuming ${massConsumed.toFixed(2)}/${massNeeded.toFixed(2)} mass needed (consumed ${treesCompletelyConsumed} trees)`);
+                console.log(`REH: Deer ${deerIndex} survived by consuming ${massConsumed.toFixed(2)}/${massNeeded.toFixed(2)} mass needed (consumed ${treesCompletelyConsumed} trees completely, ${treesPartiallyConsumed} partially)`);
                 totalDeerSurvived++;
             } else {
-                console.log(`REH: Deer ${deerIndex} starved, only found ${massConsumed.toFixed(2)}/${massNeeded.toFixed(2)} mass needed`);
+                console.log(`REH: Deer ${deerIndex} starved, only found ${massConsumed.toFixed(2)}/${massNeeded.toFixed(2)} mass needed (needed ${(massNeeded * survivalThreshold).toFixed(2)} to survive)`);
                 this.killDeer(deerIndex, 'starvation');
                 totalDeerDied++;
             }
@@ -453,8 +498,9 @@ class DeerManager {
         // Base probability depends on food availability - more scarce = harder to find
         const availabilityFactor = Math.sqrt(availableTreeCount / Math.max(1, initialTreeCount));
         
+        // FIXED: Make stamina more impactful
         // Use stamina directly (from 0-10 scale)
-        const staminaFactor = Math.min(1.0, deer.stamina / 10);
+        const staminaFactor = Math.pow(deer.stamina / 10, 0.8);
         
         // Age factor - prime-age deer have advantage
         const ageFactor = 1.0 - Math.abs(deer.age - 4) / 10; // Peak at age 4
@@ -462,7 +508,7 @@ class DeerManager {
         // Combined probability - with more reasonable base rates
         let probability = 
             (0.5 + 0.3 * availabilityFactor) * // Base chance + availability impact
-            (0.6 + 0.4 * staminaFactor) *      // Stamina boost
+            (0.5 + 0.5 * staminaFactor) *      // Stamina boost - more significant
             (0.7 + 0.3 * ageFactor);           // Age modifier
         
         // Cap probability between 0 and 1
