@@ -33,6 +33,11 @@ class WolfManager {
         // Initialize wolves array with empty wolves
         this.wolves = new Array(arraySize).fill(null).map(() => new Wolf(0, 0, 0, 0, 0));
         
+        // Reset death counters
+        this.ageDeath = 0;
+        this.starvationDeath = 0;
+        this.unknownDeath = 0;
+        
         let successfulInitCount = 0;
         for (let i = 0; i < populationSize; i++) {
             let newPos = this.findEmptyPosition();
@@ -42,7 +47,7 @@ class WolfManager {
             }
 
             // Create age-distributed population (normal distribution)
-            const age = Utils.randGauss(8, 3);  // Random age with normal distribution
+            const age = Utils.randGauss(6, 2);  // Adjusted to more reasonable age distribution
             const tempWolf = new Wolf(newPos + 1, age, 0, 0, 0);
             
             // Calculate properties based on age
@@ -53,7 +58,7 @@ class WolfManager {
             this.wolves[newPos] = tempWolf;
             successfulInitCount++;
             
-            console.log(`LOUP: Created wolf ${i} at position ${newPos}: age=${tempWolf.age.toFixed(1)}, mass=${tempWolf.mass.toFixed(1)}, stamina=${tempWolf.stamina.toFixed(1)}`);
+            console.log(`LOUP: Created wolf ${i} at position ${newPos}: age=${tempWolf.age.toFixed(1)}, mass=${tempWolf.mass.toFixed(1)}, stamina=${tempWolf.stamina.toFixed(1)}, hunger=${tempWolf.hunger.toFixed(1)}`);
         }
         
         console.log(`LOUP: Initialization complete. Created ${successfulInitCount}/${populationSize} wolves`);
@@ -70,10 +75,12 @@ class WolfManager {
         const normalizedFactor = Math.min(10, Math.max(1, staminaFactor));
         
         // Apply non-linear scaling (1=very weak, 5=normal, 10=very strong)
-        const scaledFactor = Math.pow(normalizedFactor / 5.0, 1.5);
+        // More impact from the stamina factor
+        const scaledFactor = Math.pow(normalizedFactor / 5.0, 1.7);
         
         // Base curve that peaks at age 4-5 (prime age for wolves)
-        const baseCurve = Math.max(0, 10 - Math.pow(age - 4.5, 2) / 2.5);
+        // Steeper decline for very young and old wolves
+        const baseCurve = Math.max(0, 10 - Math.pow(age - 4.5, 2) / 2.2);
         
         // Apply stamina factor with non-linear impact
         return Math.min(10, baseCurve * scaledFactor);
@@ -132,7 +139,7 @@ class WolfManager {
                 
                 // Only log a sample of wolves to avoid excessive logs
                 if (Math.random() < 0.2 || index < 5) { // 20% sample or first 5 wolves
-                    console.log(`LOUP: Wolf ${index} grew from age ${oldAge.toFixed(1)} to ${wolf.age.toFixed(1)}, stamina ${oldStamina.toFixed(1)} to ${wolf.stamina.toFixed(1)}`);
+                    console.log(`LOUP: Wolf ${index} grew from age ${oldAge.toFixed(1)} to ${wolf.age.toFixed(1)}, stamina ${oldStamina.toFixed(1)} to ${wolf.stamina.toFixed(1)}, hunger=${wolf.hunger.toFixed(1)}`);
                 }
             }
         });
@@ -173,8 +180,8 @@ class WolfManager {
      */
     reproduce(maturity, reproductionFactor = 5.0) {
         // Apply reproduction factor (5 is baseline)
-        // Scale with non-linear impact for wider range (1=very low, 5=normal, 10=very high)
-        const scaledReproFactor = Math.pow(reproductionFactor / 5.0, 1.8);
+        // Scale with adjusted non-linear impact for more balanced reproduction
+        const scaledReproFactor = Math.pow(reproductionFactor / 5.0, 1.6);
         
         const aliveWolves = this.wolves.filter(wolf => wolf.isAlive());
         const matureWolves = aliveWolves.filter(wolf => wolf.age >= maturity);
@@ -183,6 +190,9 @@ class WolfManager {
         
         // Ensure small packs get a reproduction boost (ecological reality)
         const packSizeBoost = aliveWolves.length < 4 ? 2.0 : 1.0;
+        
+        // Stronger boost for middle reproduction factors (addressing feedback)
+        const middleBoost = (reproductionFactor >= 4 && reproductionFactor <= 6) ? 1.3 : 1.0;
         
         // Base birth rate tracking
         let potentialBirths = 0;
@@ -198,7 +208,8 @@ class WolfManager {
                 (1 - (populationDensity * 0.5)) * // Less density penalty
                 (wolf.stamina / 10) * 
                 scaledReproFactor *
-                packSizeBoost; // Add boost for small packs
+                packSizeBoost * // Add boost for small packs
+                middleBoost;   // Add boost for middle reproduction factors
             
             // Log a sample of reproduction chances
             if (Math.random() < 0.2) { // 20% sample
@@ -248,11 +259,34 @@ class WolfManager {
         
         this.wolves.forEach((wolf, index) => {
             if (wolf.isAlive()) {
-                // Wolves have variable lifespans
-                const deathAge = Utils.randGauss(10.0, 5);
-                if (wolf.age > deathAge) {
+                // Rebalanced wolf lifespan distribution
+                // Mean of 9 years with wider variation (SD of 4)
+                // This creates a more natural mortality curve
+                const deathAge = Utils.randGauss(9.0, 4.0);
+                
+                // Base death probability increases significantly with age
+                let deathProbability = 0;
+                
+                if (wolf.age <= 2) {
+                    // Very young wolves (pups) have moderate mortality (but not for "old age" reasons)
+                    deathProbability = 0.15;
+                } else if (wolf.age <= 4) {
+                    // Young adult wolves have lower mortality
+                    deathProbability = 0.08;
+                } else if (wolf.age > deathAge) {
+                    // Wolves beyond their natural lifespan have very high mortality
+                    deathProbability = 0.8;
+                } else {
+                    // Increasing probability as wolves age (but not yet past deathAge)
+                    // Mortality increases more sharply as wolves approach typical death age
+                    deathProbability = Math.min(0.5, (wolf.age / deathAge) * 0.3);
+                }
+                
+                // Apply death probability
+                if (Math.random() < deathProbability) {
                     this.killWolf(index, 'age');
                     deathCount++;
+                    console.log(`LOUP: Wolf ${index} died naturally at age ${wolf.age.toFixed(1)} (death age threshold: ${deathAge.toFixed(1)})`);
                 }
             }
         });
@@ -261,7 +295,8 @@ class WolfManager {
     }
 
     /**
-     * Process hunting for all wolves
+     * Process hunting for all wolves - COMPLETELY REWORKED
+     * Now uses a hunting capacity model similar to deer foraging
      * @param {DeerManager} deerManager - DeerManager instance for deer interaction
      */
     processHunting(deerManager) {
@@ -273,15 +308,21 @@ class WolfManager {
         
         console.log(`LOUP: Starting hunting cycle. Available deer: ${initialDeerCount}`);
         
-        // Handle special case: no deer in ecosystem
+        // Handle special case: no deer in ecosystem - keep this special handling
         if (initialDeerCount === 0) {
             // Special handling for no deer - make some wolves survive anyway
             const wolves = this.wolves.filter(wolf => wolf.isAlive());
+            
             // Let younger wolves with better stamina survive
+            // Sort by a combined score of youth and stamina
             const survivingWolves = wolves
-                .map((wolf, index) => ({ wolf, index: this.wolves.indexOf(wolf) }))
-                .sort((a, b) => (a.wolf.age < 3 ? -1 : 1)) // Prioritize young wolves
-                .slice(0, Math.max(1, Math.floor(wolves.length * 0.3))); // 30% survival rate
+                .map((wolf, index) => ({ 
+                    wolf, 
+                    index: this.wolves.indexOf(wolf),
+                    survivalScore: (7 - Math.min(7, wolf.age)) + (wolf.stamina / 2) // Youth + stamina gives survival advantage
+                }))
+                .sort((a, b) => b.survivalScore - a.survivalScore) // Higher score first
+                .slice(0, Math.max(1, Math.floor(wolves.length * 0.2))); // 20% survival rate (reduced from 30%)
                 
             // Mark the rest as dead
             this.wolves.forEach((wolf, index) => {
@@ -310,6 +351,11 @@ class WolfManager {
         let totalWolvesStarved = 0;
         let totalDeerKilled = 0;
         
+        // Pack dynamics - wolves hunt better in packs
+        const wolfCount = this.wolves.filter(w => w.isAlive()).length;
+        const packBonus = Math.min(1.5, 0.7 + (wolfCount / 10));
+        console.log(`LOUP: Pack hunting bonus: ${packBonus.toFixed(2)} (${wolfCount} wolves in pack)`);
+        
         for (const wolfIndex of sortedWolfIndices) {
             const wolf = this.wolves[wolfIndex];
             
@@ -321,76 +367,74 @@ class WolfManager {
                 continue;
             }
             
-            // Scale hunger based on hunger factor
+            // Calculate hunger-based mass needed
             // More realistic calculation: larger/older wolves need more food
-            const massNeeded = wolf.hunger * (wolf.mass / 30);
+            const hungerFactor = Math.pow(wolf.hunger / 5.0, 1.2); // Non-linear scaling of hunger
+            const massNeeded = hungerFactor * (wolf.mass / 25); // Adjusted divisor for more reasonable mass needed
             
-            // Calculate hunting success - wolf's ability to find deer
-            const huntingSuccess = this.calculateHuntingSuccess(
-                wolf,
-                remainingDeer.length,
-                initialDeerCount
-            );
+            // Calculate hunting capacity (similar to deer foraging capacity)
+            const huntingCapacity = this.calculateHuntingCapacity(wolf, remainingDeer.length, packBonus);
             
-            // Calculate how many deer the wolf has a chance to catch
-            // Add some randomness to hunting success
-            const minSuccessRate = Math.min(0.4, huntingSuccess); // At least 40% if possible
-            const successRate = minSuccessRate + (Math.random() * (huntingSuccess - minSuccessRate));
+            // Calculate survival threshold based on hunger
+            // Hungrier wolves need more food to survive
+            const survivalThreshold = wolf.hunger <= 3 ? 0.4 : 
+                                       wolf.hunger <= 7 ? 0.6 : 0.7;
             
-            // Number of deer a wolf can find depends on hunger
-            const deerFound = Math.max(1, Math.ceil(wolf.hunger * successRate));
-            
-            // Pack bonus for hunting (wolves hunt better in packs)
-            const wolfCount = this.wolves.filter(w => w.isAlive()).length;
-            const packBonus = Math.min(1.5, 0.7 + (wolfCount / 10));
-            
-            // Log the probability calculations
-            console.log(`LOUP: Wolf ${wolfIndex} hunting - success prob: ${huntingSuccess.toFixed(2)}, ` + 
-                        `success rate: ${successRate.toFixed(2)}, ` + 
-                        `mass needed: ${massNeeded.toFixed(1)}, ` +
-                        `deer found: ${deerFound}, ` +
+            console.log(`LOUP: Wolf ${wolfIndex} hunting - mass needed: ${massNeeded.toFixed(1)}, ` + 
+                        `hunting capacity: ${huntingCapacity}, ` +
                         `stamina: ${wolf.stamina.toFixed(1)}, ` +
                         `age: ${wolf.age.toFixed(1)}, ` +
-                        `pack size: ${wolfCount}, pack bonus: ${packBonus.toFixed(1)}`);
+                        `survival threshold: ${(survivalThreshold * 100).toFixed(0)}%`);
             
-            // Actual deer captured is limited
-            const deerCaptured = Math.min(
-                deerFound,
-                2, // Wolves typically don't catch more than a couple deer at once
-                remainingDeer.length // Can't catch more deer than available
-            );
+            // Shuffle the remaining deer for random encounter
+            const shuffledDeer = [...remainingDeer].sort(() => Math.random() - 0.5);
             
-            // Calculate if wolf found enough food
+            // Track mass consumed and deer killed
             let massConsumed = 0;
             let deerIndicesKilled = [];
             
-            // Remove captured deer from environment
-            for (let i = 0; i < deerCaptured && remainingDeer.length > 0; i++) {
-                // Take a random deer from the remaining pool
-                const randomIndex = Math.floor(Math.random() * remainingDeer.length);
-                const capturedDeer = remainingDeer[randomIndex];
+            // Hunt deer until either enough food is found or hunting capacity is exhausted
+            const deerToCheck = Math.min(huntingCapacity, shuffledDeer.length);
+            
+            for (let i = 0; i < deerToCheck && massConsumed < massNeeded; i++) {
+                const deer = shuffledDeer[i];
+                if (!deer) continue;
                 
-                // Remove from available pool
-                remainingDeer.splice(randomIndex, 1);
+                // Check if wolf successfully catches this deer
+                // Lower success rate for individual catches (more realistic)
+                // Young/prime-age wolves with good stamina are better hunters
+                const catchSuccess = this.calculateCatchSuccess(wolf, deer, packBonus);
                 
-                // Calculate how much of the deer the wolf actually consumes
-                // Wolf takes what it needs, not the entire deer
-                const massFromThisDeer = Math.min(capturedDeer.mass, massNeeded - massConsumed);
-                
-                // Remove from deer population (kill the deer)
-                const deerIndex = deerManager.deers.indexOf(capturedDeer);
-                if (deerIndex !== -1) {
-                    // Save the deer index so we can kill it later
-                    deerIndicesKilled.push(deerIndex);
+                if (Math.random() < catchSuccess) {
+                    // Successfully caught deer
+                    const deerIndex = deerManager.deers.indexOf(deer);
+                    if (deerIndex !== -1) {
+                        // How much mass does the wolf still need?
+                        const massStillNeeded = massNeeded - massConsumed;
                     
-                    // Add mass to what the wolf consumed
-                    massConsumed += massFromThisDeer;
-                    totalDeerKilled++;
-                    
-                    // If wolf has enough food, stop hunting
-                    if (massConsumed >= massNeeded) {
-                        break;
+                        // Calculate how much of the deer the wolf consumes
+                        // Wolf takes what it needs, not necessarily the entire deer
+                        const massFromThisDeer = Math.min(deer.mass, massStillNeeded);
+                        
+                        // Add mass to what the wolf consumed
+                        massConsumed += massFromThisDeer;
+                        totalDeerKilled++;
+                        
+                        // Remove deer from available pool
+                        remainingDeer = remainingDeer.filter(d => d !== deer);
+                        
+                        // Save deer index to kill later
+                        deerIndicesKilled.push(deerIndex);
+                        
+                        console.log(`LOUP: Wolf ${wolfIndex} caught deer at position ${deerIndex}, consuming ${massFromThisDeer.toFixed(1)} mass`);
+                        
+                        // If wolf has enough food, stop hunting
+                        if (massConsumed >= massNeeded) {
+                            break;
+                        }
                     }
+                } else {
+                    console.log(`LOUP: Wolf ${wolfIndex} failed to catch deer (success rate: ${(catchSuccess * 100).toFixed(1)}%)`);
                 }
             }
             
@@ -400,12 +444,11 @@ class WolfManager {
             });
             
             // Determine if wolf survives based on how much it ate compared to what it needed
-            // Now needs 60% of its hunger satisfied to survive
-            if (massConsumed >= massNeeded * 0.6) {
-                console.log(`LOUP: Wolf ${wolfIndex} survived: caught ${deerIndicesKilled.length} deer (${massConsumed.toFixed(1)}/${massNeeded.toFixed(1)} mass)`);
+            if (massConsumed >= massNeeded * survivalThreshold) {
+                console.log(`LOUP: Wolf ${wolfIndex} survived: caught ${deerIndicesKilled.length} deer (${massConsumed.toFixed(1)}/${massNeeded.toFixed(1)} mass consumed, ${(massConsumed/massNeeded*100).toFixed(0)}% of needed)`);
                 totalWolvesSurvived++;
             } else {
-                console.log(`LOUP: Wolf ${wolfIndex} starved: found only ${massConsumed.toFixed(1)}/${massNeeded.toFixed(1)} mass needed`);
+                console.log(`LOUP: Wolf ${wolfIndex} starved: found only ${massConsumed.toFixed(1)}/${massNeeded.toFixed(1)} mass needed (${(massConsumed/massNeeded*100).toFixed(0)}% of needed)`);
                 this.killWolf(wolfIndex, 'starvation');
                 totalWolvesStarved++;
             }
@@ -415,39 +458,73 @@ class WolfManager {
     }
     
     /**
-     * Calculate hunting success (ability to catch prey)
+     * NEW METHOD: Calculate hunting capacity for wolves
+     * This represents how many deer a wolf can potentially check/chase while hunting
      * @param {Wolf} wolf - Wolf attempting to hunt
      * @param {number} availableDeerCount - Number of available deer
-     * @param {number} initialDeerCount - Initial number of deer
-     * @returns {number} - Probability of successful hunting
+     * @param {number} packBonus - Bonus from hunting in a pack
+     * @returns {number} - Number of deer the wolf can potentially encounter
      */
-    calculateHuntingSuccess(wolf, availableDeerCount, initialDeerCount) {
-        // No deer means no chance of finding food
-        if (availableDeerCount === 0) return 0;
+    calculateHuntingCapacity(wolf, availableDeerCount, packBonus) {
+        // Base capacity dependent on stamina (stronger wolves can check more deer)
+        // Scale non-linearly so low stamina has a significant disadvantage
+        let baseCapacity;
         
-        // Base probability depends on prey availability - more scarce = harder to find
-        const availabilityFactor = Math.min(1.0, Math.sqrt(availableDeerCount / Math.max(1, initialDeerCount)));
+        if (wolf.stamina <= 3) {
+            // Very low stamina wolves have severely limited hunting capacity
+            baseCapacity = Math.max(1, Math.floor(wolf.stamina));
+        } else {
+            // Normal to high stamina wolves have better capacity
+            baseCapacity = Math.floor(2 + (wolf.stamina / 2));
+        }
         
-        // Use stamina directly (from 0-10 scale)
-        const staminaFactor = Math.min(1.0, wolf.stamina / 10);
+        // Age factor - prime-age wolves (3-6 years) have the best hunting capacity
+        const ageFactor = Math.max(0.5, 1.0 - Math.abs(wolf.age - 4.5) / 8);
         
-        // Age factor - prime-age wolves have advantage
-        const ageFactor = 1.0 - Math.abs(wolf.age - 4) / 8; // Peak at age 4
+        // Apply factors and pack bonus to determine final capacity
+        const finalCapacity = Math.max(
+            1, // Always check at least one deer
+            Math.round(baseCapacity * ageFactor * packBonus)
+        );
         
-        // Pack dynamics - wolves hunt better in packs
-        const wolfCount = this.wolves.filter(w => w.isAlive()).length;
-        // Pack factor increases up to 1.5 for packs of 5+, but smaller packs have disadvantage
-        const packFactor = Math.min(1.5, 0.7 + (wolfCount / 10));
+        // Limit by available deer
+        return Math.min(finalCapacity, availableDeerCount);
+    }
+    
+    /**
+     * NEW METHOD: Calculate success rate for catching a specific deer
+     * @param {Wolf} wolf - Wolf attempting to catch deer
+     * @param {Object} deer - Deer being hunted
+     * @param {number} packBonus - Bonus from hunting in a pack
+     * @returns {number} - Probability of successful catch
+     */
+    calculateCatchSuccess(wolf, deer, packBonus) {
+        // Base success rate depends on wolf's stamina
+        // Scale non-linearly so low stamina has a much lower success rate
+        let baseSuccess;
         
-        // Combined probability
-        let probability = 
-            (0.4 + 0.4 * availabilityFactor) * // Base chance + availability impact
-            (0.6 + 0.4 * staminaFactor) *      // Stamina boost
-            (0.7 + 0.3 * ageFactor) *          // Age modifier
-            packFactor;                         // Pack bonus
+        if (wolf.stamina <= 3) {
+            // Very low stamina wolves have very poor success
+            baseSuccess = 0.1 * (wolf.stamina / 3);
+        } else {
+            // Normal to high stamina wolves have better success
+            baseSuccess = 0.3 + 0.3 * ((wolf.stamina - 3) / 7);
+        }
         
-        // Cap probability between 0 and 1
-        return Math.max(0, Math.min(0.9, probability)); // Max 90% success
+        // Age factor - prime-age wolves (3-6 years) have better success
+        const wolfAgeFactor = Math.max(0.5, 1.0 - Math.abs(wolf.age - 4.5) / 9);
+        
+        // Deer factors - younger and older deer are easier to catch
+        const deerAgeFactor = deer.age < 2 || deer.age > 8 ? 1.3 : 1.0;
+        
+        // Deer stamina affects its ability to escape
+        const deerStaminaFactor = Math.max(0.7, 1.2 - (deer.stamina / 15));
+        
+        // Calculate final success probability
+        let finalSuccess = baseSuccess * wolfAgeFactor * deerAgeFactor * deerStaminaFactor * packBonus;
+        
+        // Cap between 0.1 and 0.8
+        return Math.max(0.1, Math.min(0.8, finalSuccess));
     }
 
     /**
