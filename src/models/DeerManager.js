@@ -271,7 +271,8 @@ class DeerManager {
      * @param {number} edibleAge - Maximum age of trees that deer can eat
      * @param {TreeManager} treeManager - TreeManager instance for tree interaction
      */
-    processFeeding(trees, edibleAge = 4, treeManager) {
+    processFeeding(trees, edibleAge, treeManager) {
+        // FIXED: Removed default parameter value that was overriding passed value
         // DEBUG: Log the actual edibleAge value being used
         console.log(`REH-DEBUG: Processing feeding with edibleAge=${edibleAge}`);
         
@@ -390,8 +391,9 @@ class DeerManager {
                 availableTrees.length
             );
             
-            // Sort trees by mass for realistic selection
-            availableTrees.sort((a, b) => b.mass - a.mass);
+            // FIXED: Randomize trees instead of sorting by mass
+            // Shuffle available trees to simulate random foraging
+            const shuffledTrees = [...availableTrees].sort(() => Math.random() - 0.5);
             
             // Track trees completely consumed
             let treesCompletelyConsumed = 0;
@@ -399,7 +401,7 @@ class DeerManager {
             
             // First try to consume only what's needed from available trees
             for (let i = 0; i < treesToConsume && massConsumed < massNeeded; i++) {
-                const tree = availableTrees[i];
+                const tree = shuffledTrees[i];
                 
                 if (!tree) continue;
                 
@@ -410,23 +412,23 @@ class DeerManager {
                 const massStillNeeded = massNeeded - massConsumed;
                 
                 // DEBUG: Log the tree being considered
-            console.log(`REH-DEBUG: Considering tree: age=${tree.age.toFixed(1)}, mass=${tree.mass.toFixed(2)}, edible=${tree.age <= edibleAge}`);
+                console.log(`REH-DEBUG: Considering tree: age=${tree.age.toFixed(1)}, mass=${tree.mass.toFixed(2)}, edible=${tree.age <= edibleAge}`);
             
-            // If tree has enough mass to satisfy the deer's remaining need
-            if (tree.mass >= massStillNeeded) {
-                // Consume only what's needed
-                massConsumed += massStillNeeded;
-                
-                // Calculate percentage of tree consumed
-                const percentConsumed = massStillNeeded / tree.mass;
-                
-                // DEBUG: Log consumption details
-                console.log(`REH-DEBUG: Consuming ${(percentConsumed*100).toFixed(1)}% of tree age=${tree.age.toFixed(1)}`);
-                
-                // FIXED: More realistic tree consumption rules
-                // If deer eats 30% or more of tree, tree dies
-                // Also, if tree is very young (age <= 2) and deer eats any of it, tree dies
-                if (percentConsumed >= 0.3 || tree.age <= 2) {
+                // If tree has enough mass to satisfy the deer's remaining need
+                if (tree.mass >= massStillNeeded) {
+                    // Consume only what's needed
+                    massConsumed += massStillNeeded;
+                    
+                    // Calculate percentage of tree consumed
+                    const percentConsumed = massStillNeeded / tree.mass;
+                    
+                    // DEBUG: Log consumption details
+                    console.log(`REH-DEBUG: Consuming ${(percentConsumed*100).toFixed(1)}% of tree age=${tree.age.toFixed(1)}`);
+                    
+                    // FIXED: More realistic tree consumption rules
+                    // If deer eats 30% or more of tree, tree dies
+                    // Also, if tree is very young (age <= 2) and deer eats any of it, tree dies
+                    if (percentConsumed >= 0.3 || tree.age <= 2) {
                         // Tree is killed
                         if (treeManager) {
                             treeManager.markAsConsumedByDeer(treeIndex);
@@ -437,8 +439,7 @@ class DeerManager {
                         }
                         
                         // Remove from available pool
-                        availableTrees.splice(i, 1);
-                        i--; // Adjust index since we removed an item
+                        availableTrees = availableTrees.filter(t => t !== tree);
                         treesCompletelyConsumed++;
                     } else {
                         console.log(`REH: Tree survived partial consumption (age: ${tree.age.toFixed(1)}, only ${(percentConsumed*100).toFixed(1)}% eaten)`);
@@ -464,8 +465,7 @@ class DeerManager {
                     }
                     
                     // Remove from available pool
-                    availableTrees.splice(i, 1);
-                    i--; // Adjust index since we removed an item
+                    availableTrees = availableTrees.filter(t => t !== tree);
                     treesCompletelyConsumed++;
                 }
             }

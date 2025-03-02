@@ -64,7 +64,7 @@ class SimulationManager {
             }
         };
 
-        // Deep merge configs
+        // Deep merge configs ensuring tree.edibleAge exists
         const mergedConfig = {
             ...defaultConfig,
             tree: { ...defaultConfig.tree, ...(config.tree || {}) },
@@ -220,8 +220,8 @@ class SimulationManager {
             // Step 5: Process feeding (most critical part of deer lifecycle)
             this.deerManager.processFeeding(
                 this.treeManager.trees, 
-                this.config.tree.edibleAge || 4,
-                this.treeManager 
+                this.config.tree.edibleAge, 
+                this.treeManager
             );
             
             // === WOLF LIFECYCLE ===

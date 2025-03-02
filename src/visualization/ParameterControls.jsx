@@ -157,11 +157,12 @@ const ParameterControls = ({ defaultConfig, onStart }) => {
  
             </label>
             <label className="block">
-              Edible Age
+              Edible Age (Max age deer can eat)
               <input
                 type="number"
                 min="1"
-                value={config.tree.edibleAge || 2}
+                max="10"
+                value={config.tree.edibleAge || 4}
                 onChange={(e) => handleChange('tree', 'edibleAge', e.target.value)}
                 className="w-full mt-1 px-2 py-1 border rounded"
               />
