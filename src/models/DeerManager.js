@@ -49,10 +49,10 @@ class DeerManager {
             // Calculate properties based on age
             tempDeer.mass = age > 4 ? 28 : age * 7;
             
-            // FIXED: Scale hunger based on hunger factor more realistically
+            // Scale hunger based on hunger factor more realistically
             tempDeer.hunger = age > 4 ? hunger : (age * hunger / 4.0);
             
-            // FIXED: Young deer should have lower stamina compared to adults
+            // Young deer should have lower stamina compared to adults
             tempDeer.stamina = this.calculateStamina(age, staminaFactor);
 
             this.deers[newPos] = tempDeer;
@@ -77,7 +77,7 @@ class DeerManager {
         // Apply non-linear scaling (1=very weak, 5=normal, 10=very strong)
         const scaledFactor = Math.pow(normalizedFactor / 5.0, 1.5);
         
-        // FIXED: Adjusted age curve to give young deer lower stamina
+        // Adjusted age curve to give young deer lower stamina
         // Peak at age 4-5, but lower for very young deer
         const baseCurve = Math.max(0, 10 - Math.pow(age - 4.5, 2) / 2.5);
         
@@ -184,7 +184,7 @@ class DeerManager {
      * @param {number} reproductionFactor - Factor affecting reproduction rate (1-10 scale)
      */
     reproduce(maturity, reproductionFactor = 5.0) {
-        // FIXED: Improved reproduction scaling to make high values more impactful
+        // Improved reproduction scaling to make high values more impactful
         // Scale reproduction factor where 5 is "normal"
         // Non-linear scaling: 1=very low, 5=normal, 10=much higher reproduction
         const scaledReproFactor = Math.pow(reproductionFactor / 5.0, 2.5);
@@ -197,13 +197,13 @@ class DeerManager {
         // Keep track of potential births
         let potentialBirths = 0;
         
-        // FIXED: Improved reproduction calculation for better population dynamics
+        // Improved reproduction calculation for better population dynamics
         matureDeer.forEach(deer => {
             // Population density has less impact at mid-range
             const populationDensity = aliveDeer.length / this.deers.length;
             const densityFactor = 1 - (Math.pow(populationDensity, 1.5) * 0.7);
             
-            // FIXED: Higher base probability and stronger reproduction factor impact
+            // Higher base probability and stronger reproduction factor impact
             const reproductionProbability = 
                 0.5 *  // Increased base probability from 0.4 to 0.5
                 densityFactor *  // Improved density impact
@@ -211,7 +211,7 @@ class DeerManager {
                 (1 / (1 + Math.exp(-deer.age + maturity))) *  // Probability peaks around maturity
                 scaledReproFactor;  // Apply scaled reproduction factor - now more impactful
             
-            // FIXED: Apply a direct multiplier for high reproduction factor
+            // Apply a direct multiplier for high reproduction factor
             const finalProbability = reproductionFactor >= 8 ? 
                 reproductionProbability * 1.5 : reproductionProbability;
             
@@ -236,7 +236,7 @@ class DeerManager {
                 break; // No more space available
             }
             
-            // FIXED: Give newborn deer appropriate initial values
+            // Give newborn deer appropriate initial values
             const newDeer = new Deer(newPos + 1, 0, 1, 1, 5); // Lower initial stamina
             this.deers[newPos] = newDeer;
             actualBirths++;
@@ -272,8 +272,7 @@ class DeerManager {
      * @param {TreeManager} treeManager - TreeManager instance for tree interaction
      */
     processFeeding(trees, edibleAge, treeManager) {
-        // FIXED: Removed default parameter value that was overriding passed value
-        // DEBUG: Log the actual edibleAge value being used
+        // Log the actual edibleAge value being used
         console.log(`REH-DEBUG: Processing feeding with edibleAge=${edibleAge}`);
         
         // CLARIFICATION: edibleAge is the maximum age of trees that deer can eat
@@ -283,7 +282,7 @@ class DeerManager {
         const edibleTrees = trees.filter(tree => 
             tree instanceof Tree && tree.position !== 0 && tree.age <= edibleAge);
         
-        // DEBUG: Log age distribution of all trees and edible trees
+        // Log age distribution of all trees and edible trees
         const allTreeAges = trees
             .filter(tree => tree instanceof Tree && tree.position !== 0)
             .map(tree => tree.age);
@@ -318,7 +317,7 @@ class DeerManager {
     
         console.log(`REH: Feeding cycle - ${initialEdibleCount} edible trees (age <= ${edibleAge}) for ${this.getPopulationCount()} deer`);
         
-        // Calculate average tree mass
+        // Calculate average tree mass for informational purposes only
         const avgTreeMass = initialEdibleCount > 0 ? totalEdibleMass / initialEdibleCount : 0;
         console.log(`REH: Available tree mass: ${totalEdibleMass.toFixed(1)} total, ${avgTreeMass.toFixed(3)} per tree`);
         
@@ -346,7 +345,7 @@ class DeerManager {
                 continue;
             }
             
-            // FIXED: Scale hunger based on the hunger factor much more significantly
+            // Scale hunger based on the hunger factor much more significantly
             // This makes hunger level 1-10 scale have a dramatic effect on food needed
             const massNeeded = deer.hunger * 0.2 * Math.pow(deer.hunger / 5, 0.5);
             
@@ -357,41 +356,36 @@ class DeerManager {
                 initialEdibleCount
             );
             
-            // Calculate how many trees the deer actually finds
-            const successRate = Math.max(0.5, foragingSuccess);
-            
-            // FIXED: Made survival threshold depend on hunger factor
+            // Made survival threshold depend on hunger factor
             // Lower hunger factor (1-3) = easier survival at 60% of needed mass
             // Medium hunger factor (4-7) = need 70% of needed mass
             // High hunger factor (8-10) = need 80% of needed mass
             const survivalThreshold = deer.hunger <= 3 ? 0.6 : 
                                     deer.hunger <= 7 ? 0.7 : 0.8;
             
-            // Calculate trees needed for reference
-            const treesNeededForHunger = Math.max(1, Math.ceil(massNeeded / Math.max(0.01, avgTreeMass)));
+            // NEW: Calculate foraging capacity based on stamina and success
+            // This is more realistic - it's how many trees the deer can check while foraging
+            // Higher stamina and success rate means more foraging ability
+            const foragingCapacity = Math.max(
+                1, 
+                Math.floor(2 + (deer.stamina / 2) * foragingSuccess * 3)
+            );
             
-            // FIXED: Trees found depends on stamina and foraging success
-            // Higher stamina and success rate means more trees found
-            const treesFound = Math.max(1, Math.floor(treesNeededForHunger * successRate * (deer.stamina / 10)));
-            
-            // Log the foraging attempt
+            // Log the foraging attempt with the new approach
             console.log(`REH: Deer ${deerIndex} foraging - success prob: ${foragingSuccess.toFixed(2)}, ` +
-                        `success rate: ${successRate.toFixed(2)}, ` +
+                        `foraging capacity: ${foragingCapacity} trees, ` +
                         `mass needed: ${massNeeded.toFixed(2)}, ` +
-                        `trees needed: ${treesNeededForHunger}, ` +
-                        `trees found: ${treesFound}, ` +
                         `stamina: ${deer.stamina.toFixed(1)}, ` +
                         `hunger factor: ${deer.hunger.toFixed(1)}`);
             
-            // FIXED: Improved efficient feeding approach
             let massConsumed = 0;
-            const treesToConsume = Math.min(
-                treesFound,
-                Math.ceil(availableTrees.length * 0.3),
+            // The deer will try to forage up to its capacity
+            const treesToCheck = Math.min(
+                foragingCapacity,
                 availableTrees.length
             );
             
-            // FIXED: Randomize trees instead of sorting by mass
+            // Randomize trees instead of sorting by mass
             // Shuffle available trees to simulate random foraging
             const shuffledTrees = [...availableTrees].sort(() => Math.random() - 0.5);
             
@@ -399,8 +393,8 @@ class DeerManager {
             let treesCompletelyConsumed = 0;
             let treesPartiallyConsumed = 0;
             
-            // First try to consume only what's needed from available trees
-            for (let i = 0; i < treesToConsume && massConsumed < massNeeded; i++) {
+            // Realistically forage until either satisfied or exhausted foraging capacity
+            for (let i = 0; i < treesToCheck && massConsumed < massNeeded; i++) {
                 const tree = shuffledTrees[i];
                 
                 if (!tree) continue;
@@ -425,7 +419,7 @@ class DeerManager {
                     // DEBUG: Log consumption details
                     console.log(`REH-DEBUG: Consuming ${(percentConsumed*100).toFixed(1)}% of tree age=${tree.age.toFixed(1)}`);
                     
-                    // FIXED: More realistic tree consumption rules
+                    // More realistic tree consumption rules
                     // If deer eats 30% or more of tree, tree dies
                     // Also, if tree is very young (age <= 2) and deer eats any of it, tree dies
                     if (percentConsumed >= 0.3 || tree.age <= 2) {
@@ -498,7 +492,7 @@ class DeerManager {
         // Base probability depends on food availability - more scarce = harder to find
         const availabilityFactor = Math.sqrt(availableTreeCount / Math.max(1, initialTreeCount));
         
-        // FIXED: Make stamina more impactful
+        // Make stamina more impactful
         // Use stamina directly (from 0-10 scale)
         const staminaFactor = Math.pow(deer.stamina / 10, 0.8);
         
