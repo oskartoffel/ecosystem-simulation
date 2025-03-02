@@ -29,10 +29,17 @@ class DeerManager {
      * @param {number} hunger - Hunger factor (1-10 scale)
      */
     initialize(populationSize, arraySize, staminaFactor, hunger) {
-        console.log(`REH: Starting initialization with population=${populationSize}, stamina=${staminaFactor}, hunger=${hunger}`);
+        console.log(`REH: === INITIALIZATION START === (target=${populationSize}, stamina=${staminaFactor}, hunger=${hunger})`);
+        console.log(`REH: Parameter impact - Higher stamina increases foraging ability, higher hunger makes survival harder`);
         
         // Initialize deers array with empty deer
         this.deers = new Array(arraySize).fill(null).map(() => new Deer(0, 0, 0, 0, 0));
+        
+        // Reset death counters
+        this.ageDeath = 0;
+        this.starvationDeath = 0;
+        this.predationDeath = 0;
+        this.unknownDeath = 0;
         
         let successfulInitCount = 0;
         for (let i = 0; i < populationSize; i++) {
@@ -58,10 +65,13 @@ class DeerManager {
             this.deers[newPos] = tempDeer;
             successfulInitCount++;
             
-            console.log(`REH: Created deer ${i} at position ${newPos}: age=${tempDeer.age.toFixed(1)}, mass=${tempDeer.mass.toFixed(1)}, stamina=${tempDeer.stamina.toFixed(1)}`);
+            // Only log some of the deer to avoid excessive output
+            if (i < 5 || i % 10 === 0) {
+                console.log(`REH: Created deer ${i} at position ${newPos}: age=${tempDeer.age.toFixed(1)}, mass=${tempDeer.mass.toFixed(1)}, stamina=${tempDeer.stamina.toFixed(1)}, hunger=${tempDeer.hunger.toFixed(1)}`);
+            }
         }
         
-        console.log(`REH: Initialization complete. Created ${successfulInitCount}/${populationSize} deer`);
+        console.log(`REH: === INITIALIZATION COMPLETE === Created ${successfulInitCount}/${populationSize} deer`);
     }
 
     /**
@@ -125,13 +135,15 @@ class DeerManager {
      */
     grow(staminaFactor, hunger) {
         const initialCount = this.getPopulationCount();
-        console.log(`REH: Growing deer population (${initialCount} deer)`);
+        console.log(`REH: === GROWTH START === (population=${initialCount}, stamina=${staminaFactor}, hunger=${hunger})`);
+        console.log(`REH: Parameter Impact - Higher stamina factor increases foraging ability, higher hunger makes survival harder`);
         
         this.deers.forEach(deer => {
             if (deer.isAlive()) {
                 // Store original values for logging
                 const oldAge = deer.age;
                 const oldStamina = deer.stamina;
+                const oldHunger = deer.hunger;
                 
                 // Update age and recalculate properties
                 deer.age += 1;
@@ -141,12 +153,12 @@ class DeerManager {
                 
                 // Only log a sample of deer to avoid excessive logs
                 if (Math.random() < 0.1) { // 10% sample
-                    console.log(`REH: Deer grew from age ${oldAge.toFixed(1)} to ${deer.age.toFixed(1)}, stamina ${oldStamina.toFixed(1)} to ${deer.stamina.toFixed(1)}`);
+                    console.log(`REH: Deer sample: age ${oldAge.toFixed(1)}→${deer.age.toFixed(1)}, stamina ${oldStamina.toFixed(1)}→${deer.stamina.toFixed(1)}, hunger ${oldHunger.toFixed(1)}→${deer.hunger.toFixed(1)}`);
                 }
             }
         });
         
-        console.log(`REH: Growth complete for deer population`);
+        console.log(`REH: === GROWTH COMPLETE === All deer aged by 1 year, attributes recalculated`);
     }
 
     /**
@@ -185,14 +197,18 @@ class DeerManager {
      */
     reproduce(maturity, reproductionFactor = 5.0) {
         // Improved reproduction scaling to make high values more impactful
-        // Scale reproduction factor where 5 is "normal"
+        // Scale reproduction factor where 5 is "normal" but with higher baseline
         // Non-linear scaling: 1=very low, 5=normal, 10=much higher reproduction
-        const scaledReproFactor = Math.pow(reproductionFactor / 5.0, 2.5);
+        
+        // ADJUSTED: Increased baseline reproduction rate
+        // Original: Math.pow(reproductionFactor / 5.0, 2.5)
+        // Now more generous at level 5, still scales similarly
+        const scaledReproFactor = 1.4 * Math.pow(reproductionFactor / 5.0, 2.0);
         
         const aliveDeer = this.deers.filter(deer => deer.isAlive());
         const matureDeer = aliveDeer.filter(deer => deer.age >= maturity);
         
-        console.log(`REH: Reproduction - ${matureDeer.length}/${aliveDeer.length} mature deer, factor=${reproductionFactor} (${scaledReproFactor.toFixed(2)} scaled)`);
+        console.log(`REH: === REPRODUCTION START === (mature=${matureDeer.length}/${aliveDeer.length}, factor=${reproductionFactor}) - Higher factor increases births`);
     
         // Keep track of potential births
         let potentialBirths = 0;
@@ -203,9 +219,9 @@ class DeerManager {
             const populationDensity = aliveDeer.length / this.deers.length;
             const densityFactor = 1 - (Math.pow(populationDensity, 1.5) * 0.7);
             
-            // Higher base probability and stronger reproduction factor impact
+            // ADJUSTED: Higher base probability for more births at normal levels
             const reproductionProbability = 
-                0.5 *  // Increased base probability from 0.4 to 0.5
+                0.65 *  // Increased base probability from 0.5 to 0.65
                 densityFactor *  // Improved density impact
                 (deer.stamina / 10) *  // Higher stamina increases reproduction chance
                 (1 / (1 + Math.exp(-deer.age + maturity))) *  // Probability peaks around maturity
@@ -242,14 +258,14 @@ class DeerManager {
             actualBirths++;
         }
         
-        console.log(`REH: Actually added ${actualBirths} new deer`);
+        console.log(`REH: === REPRODUCTION COMPLETE === Added ${actualBirths} new deer`);
     }
 
     /**
      * Handle natural deaths due to age
      */
     processNaturalDeaths() {
-        console.log("REH: Processing natural deaths");
+        console.log("REH: === NATURAL DEATHS START === (age-based mortality)");
         let deathCount = 0;
         
         this.deers.forEach((deer, index) => {
@@ -262,7 +278,7 @@ class DeerManager {
             }
         });
         
-        console.log(`REH: ${deathCount} deer died of natural causes`);
+        console.log(`REH: === NATURAL DEATHS COMPLETE === ${deathCount} deer died of old age`);
     }
 
     /**
@@ -273,7 +289,7 @@ class DeerManager {
      */
     processFeeding(trees, edibleAge, treeManager) {
         // Log the actual edibleAge value being used
-        console.log(`REH-DEBUG: Processing feeding with edibleAge=${edibleAge}`);
+        console.log(`REH: === FEEDING START === (edibleAge=${edibleAge}, hunger factor impact)`);
         
         // CLARIFICATION: edibleAge is the maximum age of trees that deer can eat
         // Any tree with age <= edibleAge can be consumed by deer
@@ -287,7 +303,7 @@ class DeerManager {
             .filter(tree => tree instanceof Tree && tree.position !== 0)
             .map(tree => tree.age);
         
-        console.log(`REH-DEBUG: Tree age distribution - Total trees: ${allTreeAges.length}`);
+        console.log(`REH: Environment - Total trees: ${allTreeAges.length}, Edible trees: ${edibleTrees.length}`);
         
         if (allTreeAges.length > 0) {
             const ageGroups = {
@@ -308,8 +324,7 @@ class DeerManager {
                 else ageGroups['age 5+']++;
             });
             
-            console.log(`REH-DEBUG: Tree ages: ${JSON.stringify(ageGroups)}`);
-            console.log(`REH-DEBUG: Edible trees (age <= ${edibleAge}): ${edibleTrees.length} trees`);
+            console.log(`REH: Tree age distribution: ${JSON.stringify(ageGroups)}`);
         }
         
         const totalEdibleMass = edibleTrees.reduce((sum, tree) => sum + tree.mass, 0);
@@ -475,7 +490,7 @@ class DeerManager {
             }
         }
         
-        console.log(`REH: Feeding cycle complete. ${totalDeerSurvived}/${sortedDeerIndices.length} deer survived, ${totalDeerDied} starved`);
+        console.log(`REH: === FEEDING COMPLETE === ${totalDeerSurvived}/${sortedDeerIndices.length} deer survived, ${totalDeerDied} starved`);
     }
     
     /**
@@ -492,18 +507,38 @@ class DeerManager {
         // Base probability depends on food availability - more scarce = harder to find
         const availabilityFactor = Math.sqrt(availableTreeCount / Math.max(1, initialTreeCount));
         
-        // Make stamina more impactful
-        // Use stamina directly (from 0-10 scale)
-        const staminaFactor = Math.pow(deer.stamina / 10, 0.8);
+        // Use a bifurcated approach with different formulas for low vs. normal/high stamina
+        let staminaFactor;
+        
+        // Handle low stamina with a much harsher penalty
+        if (deer.stamina <= 3) {
+            // Extreme penalty for very low stamina (1-3 range)
+            staminaFactor = Math.pow(deer.stamina / 10, 3);
+        } else {
+            // Normal curve for medium to high stamina (4-10 range)
+            // Nearly identical to original formula
+            staminaFactor = Math.pow(deer.stamina / 10, 0.9);
+        }
         
         // Age factor - prime-age deer have advantage
         const ageFactor = 1.0 - Math.abs(deer.age - 4) / 10; // Peak at age 4
         
-        // Combined probability - with more reasonable base rates
-        let probability = 
-            (0.5 + 0.3 * availabilityFactor) * // Base chance + availability impact
-            (0.5 + 0.5 * staminaFactor) *      // Stamina boost - more significant
-            (0.7 + 0.3 * ageFactor);           // Age modifier
+        // Bifurcated probability calculation
+        let probability;
+        
+        if (deer.stamina <= 3) {
+            // Very harsh formula for low stamina
+            probability = 
+                (0.5 + 0.3 * availabilityFactor) * // Base chance + availability impact
+                (0.05 + 0.95 * staminaFactor) *    // Extremely low base (0.05) for low stamina deer
+                (0.7 + 0.3 * ageFactor);           // Age modifier
+        } else {
+            // Original-like formula for normal/high stamina
+            probability = 
+                (0.5 + 0.3 * availabilityFactor) * // Base chance + availability impact
+                (0.4 + 0.6 * staminaFactor) *      // Similar to original formula
+                (0.7 + 0.3 * ageFactor);           // Age modifier
+        }
         
         // Cap probability between 0 and 1
         return Math.max(0, Math.min(0.9, probability)); // Max 90% success
@@ -515,20 +550,36 @@ class DeerManager {
      */
     processMigration(migrationFactor) {
         // Skip if factor is zero
-        if (migrationFactor <= 0) return;
+        if (migrationFactor <= 0) {
+            console.log(`REH: === MIGRATION SKIPPED === (factor=${migrationFactor} is too low)`);
+            return;
+        }
         
-        // Scale migration factor where 5 is "normal"
-        // Apply non-linear scaling for wider impact range
-        const scaledFactor = Math.pow(migrationFactor / 5.0, 1.5);
+        // ADJUSTED: Scale migration factor where 5 is "normal"
+        // Enhanced high-end scaling for more migrants at high factors
+        const scaledFactor = Math.pow(migrationFactor / 5.0, 1.8);
         
-        // The base number of migrating deer
-        const baseMigrants = 1 + Math.floor(Math.random() * 2); // 1-2 deer by default
+        // ADJUSTED: The base number of migrating deer - higher base values
+        // Also check current population - if very low, boost migration significantly
+        const currentPopulation = this.getPopulationCount();
+        let populationBoost = 1.0;
         
-        // Final number of migrants adjusted by the factor
-        const migrantCount = Math.max(0, Math.round(baseMigrants * scaledFactor));
+        // If fewer than 5 deer, dramatically increase immigration
+        if (currentPopulation < 5) {
+            populationBoost = 3.0;
+            console.log(`REH: Low population (${currentPopulation} deer) causing increased migration`);
+        }
+        
+        // Higher base migrant count (was 1-2, now 2-4) with population-based boost
+        const baseMigrants = 2 + Math.floor(Math.random() * 3); // 2-4 deer
+        
+        // Final number of migrants adjusted by the factor and population boost
+        const migrantCount = Math.max(0, Math.round(baseMigrants * scaledFactor * populationBoost));
+        
+        console.log(`REH: === MIGRATION START === (factor=${migrationFactor}) - Higher factor increases immigration`);
         
         if (migrantCount > 0) {
-            console.log(`REH: ${migrantCount} deer migrating into the ecosystem (factor=${migrationFactor})`);
+            console.log(`REH: Attempting to add ${migrantCount} migrating deer`);
             
             let successfulMigrants = 0;
             for (let i = 0; i < migrantCount; i++) {
@@ -552,8 +603,12 @@ class DeerManager {
             }
             
             if (successfulMigrants > 0) {
-                console.log(`REH: ${successfulMigrants} deer successfully migrated into the ecosystem`);
+                console.log(`REH: === MIGRATION COMPLETE === ${successfulMigrants} deer successfully migrated into the ecosystem`);
+            } else {
+                console.log(`REH: === MIGRATION COMPLETE === No deer were able to migrate (no space available)`);
             }
+        } else {
+            console.log(`REH: === MIGRATION COMPLETE === No deer migrated this cycle (random chance or low factor)`);
         }
     }
 
@@ -583,7 +638,24 @@ class DeerManager {
             ageDistribution: this.getAgeDistribution(aliveDeer)
         };
         
-        console.log(`REH: Statistics - Population=${stats.total}, Avg Age=${stats.averageAge.toFixed(1)}, Avg Stamina=${stats.averageStamina.toFixed(1)}, Deaths: Age=${this.ageDeath}, Starvation=${this.starvationDeath}, Predation=${this.predationDeath}, Unknown=${this.unknownDeath}`);
+        console.log(`REH: === YEARLY SUMMARY ===`);
+        console.log(`REH: Population: ${stats.total} deer (Avg Age: ${stats.averageAge.toFixed(1)}, Avg Stamina: ${stats.averageStamina.toFixed(1)})`);
+        console.log(`REH: Deaths: Age=${this.ageDeath}, Starvation=${this.starvationDeath}, Predation=${this.predationDeath}, Unknown=${this.unknownDeath}`);
+        
+        // Reset death counters after reporting
+        const totalDeaths = this.ageDeath + this.starvationDeath + this.predationDeath + this.unknownDeath;
+        if (totalDeaths > 0) {
+            console.log(`REH: Death causes: Age=${(this.ageDeath/totalDeaths*100).toFixed(1)}%, Starvation=${(this.starvationDeath/totalDeaths*100).toFixed(1)}%, Predation=${(this.predationDeath/totalDeaths*100).toFixed(1)}%`);
+        }
+        
+        // Log age distribution
+        if (aliveDeer.length > 0) {
+            const youngDeer = aliveDeer.filter(deer => deer.age < 3).length;
+            const matureDeer = aliveDeer.filter(deer => deer.age >= 3 && deer.age < 8).length;
+            const oldDeer = aliveDeer.filter(deer => deer.age >= 8).length;
+            
+            console.log(`REH: Age groups: Young=${youngDeer} (${(youngDeer/aliveDeer.length*100).toFixed(1)}%), Mature=${matureDeer} (${(matureDeer/aliveDeer.length*100).toFixed(1)}%), Old=${oldDeer} (${(oldDeer/aliveDeer.length*100).toFixed(1)}%)`);
+        }
         
         return stats;
     }
