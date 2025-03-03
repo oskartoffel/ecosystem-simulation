@@ -18,6 +18,13 @@ class WolfManager {
         this.ageDeath = 0;
         this.starvationDeath = 0;
         this.unknownDeath = 0;
+        
+        // Statistics tracking for enhanced UI
+        this.migrationCount = 0;
+        this.reproductionCount = 0;
+        this.huntingSuccessTotal = 0;
+        this.huntingAttempts = 0;
+        this.totalPreyKilled = 0;
     }
 
     /**
@@ -179,6 +186,7 @@ class WolfManager {
      * @param {number} reproductionFactor - Factor affecting reproduction rate (1-10 scale)
      */
     reproduce(maturity, reproductionFactor = 5.0) {
+
         // Apply reproduction factor (5 is baseline)
         // Scale with adjusted non-linear impact for more balanced reproduction
         const scaledReproFactor = Math.pow(reproductionFactor / 5.0, 1.6);
@@ -247,6 +255,8 @@ class WolfManager {
         
         if (actualBirths > 0) {
             console.log(`LOUP: ${actualBirths} wolf pups joined the pack`);
+            // Add this line to track reproduction:
+            this.reproductionCount += actualBirths;
         }
     }
 
@@ -404,7 +414,14 @@ class WolfManager {
                 // Lower success rate for individual catches (more realistic)
                 // Young/prime-age wolves with good stamina are better hunters
                 const catchSuccess = this.calculateCatchSuccess(wolf, deer, packBonus);
-                
+
+                this.huntingAttempts++;
+  
+                if (Math.random() < catchSuccess) {
+                  this.huntingSuccessTotal++;
+                  this.totalPreyKilled++;
+                }
+
                 if (Math.random() < catchSuccess) {
                     // Successfully caught deer
                     const deerIndex = deerManager.deers.indexOf(deer);
@@ -535,8 +552,8 @@ class WolfManager {
         // Skip if factor is zero
         if (migrationFactor <= 0) return;
         
+        // Your existing code here...
         // Scale migration factor where 5 is "normal"
-        // Apply non-linear scaling for wider impact range
         const packSizeBoost = this.getPopulationCount() < 3 ? 2.0 : 1.0;
         const scaledFactor = Math.pow(migrationFactor / 5.0, 1.5) * packSizeBoost;
         
@@ -547,32 +564,34 @@ class WolfManager {
         const migrantCount = Math.max(0, Math.round(baseMigrants * scaledFactor));
         
         if (migrantCount > 0) {
-            console.log(`LOUP: ${migrantCount} wolves migrating into the ecosystem (factor=${migrationFactor})`);
-            
-            let successfulMigrants = 0;
-            for (let i = 0; i < migrantCount; i++) {
-                let newPos = this.findEmptyPosition();
-                if (newPos === -1) {
-                    console.warn("LOUP: No space available for migrating wolves");
-                    break;
-                }
-                
-                // Create a mature wolf with reasonable stats
-                const age = Utils.randGauss(3, 1);  // Young adult wolf
-                const tempWolf = new Wolf(newPos + 1, age, 0, 0, 0);
-                
-                // Calculate properties based on age
-                tempWolf.mass = age > 4 ? 28 : age * 7;
-                tempWolf.hunger = age > 4 ? 5.0 : (age * 5.0 / 4.0); // Use 5 as baseline hunger
-                tempWolf.stamina = this.calculateStamina(age, 5.0); // Use 5 as baseline stamina
-                
-                this.wolves[newPos] = tempWolf;
-                successfulMigrants++;
+          console.log(`LOUP: ${migrantCount} wolves migrating into the ecosystem (factor=${migrationFactor})`);
+          
+          let localSuccessfulMigrants = 0; // Changed variable name to avoid conflicts
+          for (let i = 0; i < migrantCount; i++) {
+            let newPos = this.findEmptyPosition();
+            if (newPos === -1) {
+              console.warn("LOUP: No space available for migrating wolves");
+              break;
             }
             
-            if (successfulMigrants > 0) {
-                console.log(`LOUP: ${successfulMigrants} wolves successfully migrated into the ecosystem`);
-            }
+            // Create a mature wolf with reasonable stats
+            const age = Utils.randGauss(3, 1);  // Young adult wolf
+            const tempWolf = new Wolf(newPos + 1, age, 0, 0, 0);
+            
+            // Calculate properties based on age
+            tempWolf.mass = age > 4 ? 28 : age * 7;
+            tempWolf.hunger = age > 4 ? 5.0 : (age * 5.0 / 4.0); // Use 5 as baseline hunger
+            tempWolf.stamina = this.calculateStamina(age, 5.0); // Use 5 as baseline stamina
+            
+            this.wolves[newPos] = tempWolf;
+            localSuccessfulMigrants++;
+          }
+          
+          if (localSuccessfulMigrants > 0) {
+            console.log(`LOUP: ${localSuccessfulMigrants} wolves successfully migrated into the ecosystem`);
+            // TRACKING: Add this line to track migrations
+            this.migrationCount += localSuccessfulMigrants;
+          }
         }
     }
 
@@ -605,6 +624,29 @@ class WolfManager {
         
         return stats;
     }
+
+    getDetailedStatistics() {
+        // Get basic statistics
+        const baseStats = this.getStatistics();
+        
+        // Return enhanced statistics
+        return {
+          ...baseStats,
+          // Death causes
+          ageDeaths: this.ageDeath,
+          starvationDeaths: this.starvationDeath,
+          
+          // Additional metrics - use defaults if not tracking yet
+          migratedCount: this.migrationCount || 0,
+          reproducedCount: this.reproductionCount || 0,
+          averageHuntingSuccess: this.huntingAttempts > 0 
+            ? (this.huntingSuccessTotal / this.huntingAttempts * 100).toFixed(1) + '%'
+            : 'N/A',
+          preyKilled: this.totalPreyKilled || 0
+        };
+    }
+      
+
 
     /**
      * Get age distribution of wolf population
@@ -645,6 +687,14 @@ class WolfManager {
             hunger: wolf.hunger,
             stamina: wolf.stamina
         };
+    }
+
+    resetStatistics() {
+        this.migrationCount = 0;
+        this.reproductionCount = 0;
+        this.huntingSuccessTotal = 0;
+        this.huntingAttempts = 0;
+        this.totalPreyKilled = 0;
     }
 }
 

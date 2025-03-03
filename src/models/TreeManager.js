@@ -369,6 +369,36 @@ class TreeManager {
         return stats; 
     }
 
+    getDetailedStatistics() {
+        // The base statistics already calculated in getStatistics()
+        const baseStats = this.getStatistics();
+        
+        // Return enhanced statistics with additional data
+        return {
+          ...baseStats,
+          // Death causes breakdown (already tracked in your existing code)
+          consumedByDeer: this.consumedByDeer,
+          stressDeaths: this.stressDeaths,
+          ageDeaths: this.ageDeaths,
+          concurrenceDeaths: this.concurrenceDeaths,
+          
+          // You can add any additional tree metrics here
+          totalDeaths: this.simulationDeaths,
+          rejuvenationRate: this.calculateRejuvenationRate()
+        };
+    }
+
+    calculateRejuvenationRate() {
+        const aliveTrees = this.trees.filter(tree => tree && tree.position !== 0);
+        const youngTreeCount = aliveTrees.filter(tree => tree.age <= 5).length;
+        const matureTreeCount = aliveTrees.filter(tree => tree.age > 5).length;
+        
+        // Calculate rejuvenation rate as percentage of young trees
+        return matureTreeCount > 0 
+          ? ((youngTreeCount / matureTreeCount) * 100).toFixed(1) + '%'
+          : 'N/A';
+    }
+
     /**
      * Get age distribution of trees
      */

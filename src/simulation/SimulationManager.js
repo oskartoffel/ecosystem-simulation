@@ -164,10 +164,19 @@ class SimulationManager {
     
     simulateYear() {
         if (this.mode === 'normal') {
-            console.group(`Year ${this.year}`);
+          console.group(`Year ${this.year}`);
         }
         
         try {
+          // Reset statistics at the beginning of each year
+          // Check if the methods exist first to avoid errors
+          if (typeof this.deerManager.resetStatistics === 'function') {
+            this.deerManager.resetStatistics();
+          }
+          
+          if (typeof this.wolfManager.resetStatistics === 'function') {
+            this.wolfManager.resetStatistics();
+          }
             // Track initial populations
             const initialTreeCount = this.treeManager.getPopulationCount();
             const initialDeerCount = this.deerManager.getPopulationCount();
@@ -261,30 +270,38 @@ class SimulationManager {
             const finalDeerCount = this.deerManager.getPopulationCount();
             const finalWolfCount = this.wolfManager.getPopulationCount();
             
-            // Add death counts to current stats
-            const currentStats = this.getCurrentStats();
             
             // We no longer need this manual calculation for trees since TreeManager now tracks all death causes
             // including consumption by deer, and returns a totalDeaths property
             // currentStats.trees.deaths = Math.max(0, initialTreeCount - finalTreeCount);
             
-            currentStats.deer.deaths = Math.max(0, initialDeerCount - finalDeerCount);
-            currentStats.wolves.deaths = Math.max(0, initialWolfCount - finalWolfCount);
-            
-            // Record statistics
-            this.recordStats();
-            
-            // Advance year and notify handlers
-            this.year++;
-            this.notifyEventHandlers();
-            
-            if (this.mode === 'normal') {
+            const currentStats = {
+                year: this.year,
+                trees: typeof this.treeManager.getDetailedStatistics === 'function' 
+                    ? this.treeManager.getDetailedStatistics() 
+                    : this.treeManager.getStatistics(),
+                deer: typeof this.deerManager.getDetailedStatistics === 'function'
+                    ? this.deerManager.getDetailedStatistics()
+                    : this.deerManager.getStatistics(),
+                wolves: typeof this.wolfManager.getDetailedStatistics === 'function'
+                    ? this.wolfManager.getDetailedStatistics()
+                    : this.wolfManager.getStatistics()
+              };
+              
+              // Record statistics
+              this.recordStats();
+              
+              // Advance year and notify handlers
+              this.year++;
+              this.notifyEventHandlers();
+              
+              if (this.mode === 'normal') {
                 console.groupEnd();
-            }
-            
-            return currentStats;
-        } catch (error) {
-            if (this.mode === 'normal') {
+              }
+              
+              return currentStats;
+            } catch (error) {
+              if (this.mode === 'normal') {
                 console.error('Simulation Error:', error);
                 console.groupEnd();
             }

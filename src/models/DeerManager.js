@@ -19,7 +19,13 @@ class DeerManager {
         this.starvationDeath = 0;
         this.predationDeath = 0;
         this.unknownDeath = 0;
-    }
+        
+        // Statistics tracking for enhanced UI
+        this.migrationCount = 0;
+        this.reproductionCount = 0;
+        this.foragingSuccessTotal = 0;
+        this.foragingAttempts = 0;
+      }
 
     /**
      * Initialize deer population
@@ -150,6 +156,7 @@ class DeerManager {
      */
     reproduce(maturity, reproductionFactor = 5.0) {
         // Scale reproduction factor where 5 is "normal" 
+
         const scaledReproFactor = 1.4 * Math.pow(reproductionFactor / 5.0, 2.0);
         
         const aliveDeer = this.deers.filter(deer => deer.isAlive());
@@ -198,6 +205,9 @@ class DeerManager {
         }
         
         console.log(`REH: Added ${actualBirths} new deer`);
+        // Add this line to track reproduction:
+        this.reproductionCount += actualBirths;
+      
     }
 
     /**
@@ -225,6 +235,7 @@ class DeerManager {
      * Process feeding for all deer
      */
     processFeeding(trees, edibleAge, treeManager) {
+
         console.log(`REH: Feeding cycle - ${this.getPopulationCount()} deer`);
         
         // First, identify all edible trees
@@ -263,6 +274,9 @@ class DeerManager {
                 availableTrees.length,
                 edibleTrees.length
             );
+
+            this.foragingSuccessTotal += foragingSuccess;
+            this.foragingAttempts++;
             
             // Made survival threshold depend on hunger factor
             const survivalThreshold = deer.hunger <= 3 ? 0.6 : 
@@ -290,6 +304,7 @@ class DeerManager {
             
             // Realistically forage until either satisfied or exhausted foraging capacity
             for (let i = 0; i < treesToCheck && massConsumed < massNeeded; i++) {
+
                 const tree = shuffledTrees[i];
                 
                 if (!tree) continue;
@@ -299,7 +314,7 @@ class DeerManager {
                 
                 // How much mass does the deer still need?
                 const massStillNeeded = massNeeded - massConsumed;
-            
+
                 // If tree has enough mass to satisfy the deer's remaining need
                 if (tree.mass >= massStillNeeded) {
                     // Consume only what's needed
@@ -355,6 +370,7 @@ class DeerManager {
         }
         
         console.log(`REH: Feeding complete - ${totalDeerSurvived} deer survived, ${totalDeerDied} starved`);
+
     }
     
     /**
@@ -409,9 +425,10 @@ class DeerManager {
     processMigration(migrationFactor) {
         // Skip if factor is zero
         if (migrationFactor <= 0) {
-            return;
+          return;
         }
         
+        // Your existing code here...
         // Scale migration factor where 5 is "normal"
         const scaledFactor = Math.pow(migrationFactor / 5.0, 1.8);
         
@@ -421,7 +438,7 @@ class DeerManager {
         
         // If fewer than 5 deer, dramatically increase immigration
         if (currentPopulation < 5) {
-            populationBoost = 3.0;
+          populationBoost = 3.0;
         }
         
         // Higher base migrant count (2-4) with population-based boost
@@ -431,31 +448,33 @@ class DeerManager {
         const migrantCount = Math.max(0, Math.round(baseMigrants * scaledFactor * populationBoost));
         
         if (migrantCount > 0) {
-            console.log(`REH: Migration - attempting to add ${migrantCount} deer`);
-            
-            let successfulMigrants = 0;
-            for (let i = 0; i < migrantCount; i++) {
-                let newPos = this.findEmptyPosition();
-                if (newPos === -1) {
-                    break;
-                }
-                
-                // Create a mature deer with reasonable stats
-                const age = Utils.randGauss(4, 1);  // Young adult deer
-                const tempDeer = new Deer(newPos + 1, age, 0, 0, 0);
-                
-                // Calculate properties based on age
-                tempDeer.mass = age > 4 ? 28 : age * 7;
-                tempDeer.hunger = age > 4 ? 5.0 : (age * 5.0 / 4.0); // Use 5 as baseline hunger
-                tempDeer.stamina = this.calculateStamina(age, 5.0); // Use 5 as baseline stamina
-                
-                this.deers[newPos] = tempDeer;
-                successfulMigrants++;
+          console.log(`REH: Migration - attempting to add ${migrantCount} deer`);
+          
+          let localSuccessfulMigrants = 0; // Changed variable name to avoid conflicts
+          for (let i = 0; i < migrantCount; i++) {
+            let newPos = this.findEmptyPosition();
+            if (newPos === -1) {
+              break;
             }
             
-            if (successfulMigrants > 0) {
-                console.log(`REH: ${successfulMigrants} deer successfully migrated in`);
-            }
+            // Create a mature deer with reasonable stats
+            const age = Utils.randGauss(4, 1);  // Young adult deer
+            const tempDeer = new Deer(newPos + 1, age, 0, 0, 0);
+            
+            // Calculate properties based on age
+            tempDeer.mass = age > 4 ? 28 : age * 7;
+            tempDeer.hunger = age > 4 ? 5.0 : (age * 5.0 / 4.0); // Use 5 as baseline hunger
+            tempDeer.stamina = this.calculateStamina(age, 5.0); // Use 5 as baseline stamina
+            
+            this.deers[newPos] = tempDeer;
+            localSuccessfulMigrants++;
+          }
+          
+          if (localSuccessfulMigrants > 0) {
+            console.log(`REH: ${localSuccessfulMigrants} deer successfully migrated in`);
+            // TRACKING: Add this line to track migrations
+            this.migrationCount += localSuccessfulMigrants;
+          }
         }
     }
 
@@ -486,6 +505,34 @@ class DeerManager {
         console.log(`REH: Deer population: ${stats.total}, Deaths: Age=${this.ageDeath}, Starvation=${this.starvationDeath}, Predation=${this.predationDeath}`);
         
         return stats;
+    }
+
+    getDetailedStatistics() {
+        // Get basic statistics
+        const baseStats = this.getStatistics();
+        
+        // Return enhanced statistics
+        return {
+          ...baseStats,
+          // Death causes
+          ageDeaths: this.ageDeath,
+          starvationDeaths: this.starvationDeath,
+          predationDeaths: this.predationDeath,
+          
+          // Additional metrics - use defaults if not tracking yet
+          migratedCount: this.migrationCount || 0,
+          reproducedCount: this.reproductionCount || 0,
+          averageForagingSuccess: this.foragingAttempts > 0 
+            ? (this.foragingSuccessTotal / this.foragingAttempts * 100).toFixed(1) + '%'
+            : 'N/A'
+        };
+    }
+
+    resetStatistics() {
+        this.migrationCount = 0;
+        this.reproductionCount = 0;
+        this.foragingSuccessTotal = 0;
+        this.foragingAttempts = 0;
     }
 
     /**

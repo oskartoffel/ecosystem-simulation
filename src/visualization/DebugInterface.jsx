@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SimulationManager } from '../simulation/SimulationManager';
 import EcosystemVisualization from './EcosystemVisualization';
-import ParameterControls from './ParameterControls';
+import ImprovedParameterControls from './ImprovedParameterControls'; // Import the new component
+import EnhancedStatisticsCards from './EnhancedStatisticsCards'; // Import the new component
 import ParameterSaveDialog from './ParameterSaveDialog';
 import ParameterManager from '../utils/ParameterManager';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -237,20 +238,48 @@ const DebugInterface = () => {
         debugData[year] = {
           year,
           phase: 'simulation',
+          
+          // Basic population stats
           trees: yearStats.trees.total,
           deer: yearStats.deer.total,
           wolves: yearStats.wolves.total,
+          
+          // Age stats
           treeAvgAge: yearStats.trees.averageAge,
           deerAvgAge: yearStats.deer.averageAge,
           wolfAvgAge: yearStats.wolves.averageAge,
-          treeDeaths: yearStats.trees.deaths || 0,                // Total deaths including eaten by deer
-          treeConsumedByDeer: yearStats.trees.consumedByDeer || 0, // Trees eaten by deer
-          treeStressDeaths: yearStats.trees.stressDeaths || 0,     // Tree stress deaths
-          treeAgeDeaths: yearStats.trees.ageDeaths || 0,           // Tree age deaths
-          treeConcurrenceDeaths: yearStats.trees.concurrenceDeaths || 0, // Tree concurrence deaths
+          
+          // Tree death types - safely access properties
+          treeDeaths: yearStats.trees.deaths || 0,
+          treeConsumedByDeer: yearStats.trees.consumedByDeer || 0,
+          treeStressDeaths: yearStats.trees.stressDeaths || 0,
+          treeAgeDeaths: yearStats.trees.ageDeaths || 0,
+          treeConcurrenceDeaths: yearStats.trees.concurrenceDeaths || 0,
+          
+          // Deer death types - safely access properties that might not exist yet
           deerDeaths: yearStats.deer.deaths || 0,
+          deerAgeDeaths: yearStats.deer.ageDeaths || 0,
+          deerStarvationDeaths: yearStats.deer.starvationDeaths || 0,
+          deerPredationDeaths: yearStats.deer.predationDeaths || 0,
+          
+          // Wolf death types - safely access properties that might not exist yet
           wolfDeaths: yearStats.wolves.deaths || 0,
+          wolfAgeDeaths: yearStats.wolves.ageDeaths || 0,
+          wolfStarvationDeaths: yearStats.wolves.starvationDeaths || 0,
+          
+          // Additional detailed stats
           youngTrees: yearStats.trees.youngTrees || 0,
+          
+          // Additional statistics with safe fallbacks
+          deerForagingSuccess: yearStats.deer.averageForagingSuccess || 'N/A',
+          deerMigrated: yearStats.deer.migratedCount || 0,
+          deerReproduced: yearStats.deer.reproducedCount || 0,
+          
+          wolfHuntingSuccess: yearStats.wolves.averageHuntingSuccess || 'N/A',
+          wolfMigrated: yearStats.wolves.migratedCount || 0,
+          wolfReproduced: yearStats.wolves.reproducedCount || 0,
+          wolfPreyKilled: yearStats.wolves.preyKilled || 0,
+          
           currentYear: true // Mark the current year for visualization
         };
         
@@ -328,7 +357,7 @@ const DebugInterface = () => {
       
       <h1 className="text-2xl font-bold mb-8">Debug Mode</h1>
       
-      <ParameterControls
+      <ImprovedParameterControls
         defaultConfig={config}
         onStart={runDebugSimulation}
       />
@@ -454,34 +483,10 @@ const DebugInterface = () => {
 
           {/* Current stats cards */}
           {simulationData.length > 0 && simulationData[currentYear]?.trees !== null && (
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="bg-green-50 p-4 rounded-lg">
-                <h3 className="font-bold text-green-800">Trees</h3>
-                <p>Total: {simulationData[currentYear].trees}</p>
-                <p>Young: {simulationData[currentYear].youngTrees || 0}</p>
-                <p>Avg Age: {simulationData[currentYear].treeAvgAge?.toFixed(1) || 0}</p>
-                <div className="mt-2 pt-2 border-t border-green-200">
-                  <p className="font-semibold">Death Breakdown:</p>
-                  <p>Total Deaths: {simulationData[currentYear].treeDeaths || 0}</p>
-                  <p>• Consumed by Deer: {simulationData[currentYear].treeConsumedByDeer || 0}</p>
-                  <p>• Age Deaths: {simulationData[currentYear].treeAgeDeaths || 0}</p>
-                  <p>• Stress Deaths: {simulationData[currentYear].treeStressDeaths || 0}</p>
-                  <p>• Concurrence: {simulationData[currentYear].treeConcurrenceDeaths || 0}</p>
-                </div>
-              </div>
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <h3 className="font-bold text-orange-800">Deer</h3>
-                <p>Population: {simulationData[currentYear].deer}</p>
-                <p>Avg Age: {simulationData[currentYear].deerAvgAge?.toFixed(1) || 0}</p>
-                <p>Deaths: {simulationData[currentYear].deerDeaths || 0}</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-bold text-gray-800">Wolves</h3>
-                <p>Population: {simulationData[currentYear].wolves}</p>
-                <p>Avg Age: {simulationData[currentYear].wolfAvgAge?.toFixed(1) || 0}</p>
-                <p>Deaths: {simulationData[currentYear].wolfDeaths || 0}</p>
-              </div>
-            </div>
+            <EnhancedStatisticsCards 
+              simulationData={simulationData} 
+              currentYear={currentYear} 
+            />
           )}
 
 
