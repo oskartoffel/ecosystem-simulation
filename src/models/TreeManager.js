@@ -252,9 +252,14 @@ class TreeManager {
      */
     markAsConsumedByDeer(index) {
         if (index >= 0 && index < this.trees.length && this.trees[index].position !== 0) {
-            // Clear the tree
-            this.trees[index] = new Tree(0, 0, 0, 0, 0);
-            this.consumedByDeer++;
+          // Clear the tree
+          this.trees[index] = new Tree(0, 0, 0, 0, 0);
+          this.consumedByDeer++;
+          
+          // Log to help with debugging
+          if (!this.isStabilizing) {
+            console.log(`BAUM: Tree at position ${index} was consumed by deer. Total consumed: ${this.consumedByDeer}`);
+          }
         }
     }
 
@@ -364,7 +369,7 @@ class TreeManager {
         console.log(`BAUM: Trees: ${stats.total} (Young: ${youngTrees}, Deaths: ${totalDeaths})`);
         
         // Reset counter
-        this.consumedByDeer = 0;
+        //this.consumedByDeer = 0;
         
         return stats; 
     }
@@ -372,6 +377,8 @@ class TreeManager {
     getDetailedStatistics() {
         // The base statistics already calculated in getStatistics()
         const baseStats = this.getStatistics();
+  
+        console.log("BAUM: Detailed stats - Trees consumed by deer:", this.consumedByDeer);
         
         // Return enhanced statistics with additional data
         return {

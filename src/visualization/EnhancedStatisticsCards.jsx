@@ -90,6 +90,33 @@ const processStatistics = (simulationData, currentYear) => {
   // Extract current year's detailed data
   const currentData = simulationData[currentYear];
   
+  // Calculate averages for migrations and reproductions
+  const avgDeerMigrated = calculateAverage(
+    simulationData.map(year => year.deerMigrated || 0),
+    years
+  );
+  
+  const avgDeerReproduced = calculateAverage(
+    simulationData.map(year => year.deerReproduced || 0),
+    years
+  );
+  
+  const avgWolfMigrated = calculateAverage(
+    simulationData.map(year => year.wolfMigrated || 0),
+    years
+  );
+  
+  const avgWolfReproduced = calculateAverage(
+    simulationData.map(year => year.wolfReproduced || 0),
+    years
+  );
+  
+  // Debug logs to help find issues
+  console.log('Current year data:', currentData);
+  console.log('Tree consumed deaths:', treeConsumedDeaths);
+  console.log('Deer migrations:', simulationData.map(year => year.deerMigrated || 0));
+  console.log('Wolf migrations:', simulationData.map(year => year.wolfMigrated || 0));
+  
   return {
     trees: {
       current: currentData.trees || 0,
@@ -111,10 +138,10 @@ const processStatistics = (simulationData, currentYear) => {
       totalDeaths: totalDeerDeaths,
       avgDeaths: Math.round(avgDeerDeaths),
       currentAvgAge: currentData.deerAvgAge?.toFixed(1) || 0,
-      // These would need to be added to your simulation data collection
+      // Update these to use the current data and calculated averages
       foragingSuccess: currentData.deerForagingSuccess || 'N/A',
-      migrated: currentData.deerMigrated || 'N/A',
-      reproduced: currentData.deerReproduced || 'N/A',
+      migrated: Math.round(avgDeerMigrated),
+      reproduced: Math.round(avgDeerReproduced),
       deathCauses: {
         'Age': currentData.deerAgeDeaths || 'N/A',
         'Starvation': currentData.deerStarvationDeaths || 'N/A',
@@ -127,10 +154,10 @@ const processStatistics = (simulationData, currentYear) => {
       totalDeaths: totalWolfDeaths,
       avgDeaths: Math.round(avgWolfDeaths),
       currentAvgAge: currentData.wolfAvgAge?.toFixed(1) || 0,
-      // These would need to be added to your simulation data collection
+      // Update these to use the current data and calculated averages
       huntingSuccess: currentData.wolfHuntingSuccess || 'N/A',
-      migrated: currentData.wolfMigrated || 'N/A',
-      reproduced: currentData.wolfReproduced || 'N/A',
+      migrated: Math.round(avgWolfMigrated),
+      reproduced: Math.round(avgWolfReproduced),
       deathCauses: {
         'Starvation': currentData.wolfStarvationDeaths || 'N/A',
         'Age': currentData.wolfAgeDeaths || 'N/A'

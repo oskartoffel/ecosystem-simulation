@@ -235,6 +235,18 @@ const DebugInterface = () => {
         setCurrentYear(year);
         const yearStats = simulation.simulateYear();
         
+        // Debug logs to check what data we're getting
+        console.log(`Year ${year} detailed statistics:`, yearStats);
+        
+        // Extract tree consumption data
+        const treeConsumption = yearStats.trees.consumedByDeer || 0;
+        console.log(`Year ${year} Trees consumed by deer: ${treeConsumption}`);
+        
+        // Extract migration data
+        const deerMigration = yearStats.deer.migratedCount || 0;
+        const wolfMigration = yearStats.wolves.migratedCount || 0;
+        console.log(`Year ${year} Migrations - Deer: ${deerMigration}, Wolves: ${wolfMigration}`);
+        
         debugData[year] = {
           year,
           phase: 'simulation',
@@ -249,20 +261,20 @@ const DebugInterface = () => {
           deerAvgAge: yearStats.deer.averageAge,
           wolfAvgAge: yearStats.wolves.averageAge,
           
-          // Tree death types - safely access properties
+          // Tree death types
           treeDeaths: yearStats.trees.deaths || 0,
-          treeConsumedByDeer: yearStats.trees.consumedByDeer || 0,
+          treeConsumedByDeer: treeConsumption, // Use the extracted value
           treeStressDeaths: yearStats.trees.stressDeaths || 0,
           treeAgeDeaths: yearStats.trees.ageDeaths || 0,
           treeConcurrenceDeaths: yearStats.trees.concurrenceDeaths || 0,
           
-          // Deer death types - safely access properties that might not exist yet
+          // Deer death types
           deerDeaths: yearStats.deer.deaths || 0,
           deerAgeDeaths: yearStats.deer.ageDeaths || 0,
           deerStarvationDeaths: yearStats.deer.starvationDeaths || 0,
           deerPredationDeaths: yearStats.deer.predationDeaths || 0,
           
-          // Wolf death types - safely access properties that might not exist yet
+          // Wolf death types
           wolfDeaths: yearStats.wolves.deaths || 0,
           wolfAgeDeaths: yearStats.wolves.ageDeaths || 0,
           wolfStarvationDeaths: yearStats.wolves.starvationDeaths || 0,
@@ -270,13 +282,13 @@ const DebugInterface = () => {
           // Additional detailed stats
           youngTrees: yearStats.trees.youngTrees || 0,
           
-          // Additional statistics with safe fallbacks
+          // Migration and reproduction stats - use the extracted values
           deerForagingSuccess: yearStats.deer.averageForagingSuccess || 'N/A',
-          deerMigrated: yearStats.deer.migratedCount || 0,
+          deerMigrated: deerMigration,
           deerReproduced: yearStats.deer.reproducedCount || 0,
           
           wolfHuntingSuccess: yearStats.wolves.averageHuntingSuccess || 'N/A',
-          wolfMigrated: yearStats.wolves.migratedCount || 0,
+          wolfMigrated: wolfMigration,
           wolfReproduced: yearStats.wolves.reproducedCount || 0,
           wolfPreyKilled: yearStats.wolves.preyKilled || 0,
           

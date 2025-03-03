@@ -564,14 +564,14 @@ class WolfManager {
         const migrantCount = Math.max(0, Math.round(baseMigrants * scaledFactor));
         
         if (migrantCount > 0) {
-          console.log(`LOUP: ${migrantCount} wolves migrating into the ecosystem (factor=${migrationFactor})`);
-          
-          let localSuccessfulMigrants = 0; // Changed variable name to avoid conflicts
-          for (let i = 0; i < migrantCount; i++) {
-            let newPos = this.findEmptyPosition();
-            if (newPos === -1) {
-              console.warn("LOUP: No space available for migrating wolves");
-              break;
+            console.log(`LOUP: ${migrantCount} wolves migrating into the ecosystem (factor=${migrationFactor})`);
+            
+            let localSuccessfulMigrants = 0;
+            for (let i = 0; i < migrantCount; i++) {
+              let newPos = this.findEmptyPosition();
+              if (newPos === -1) {
+                console.warn("LOUP: No space available for migrating wolves");
+                break;
             }
             
             // Create a mature wolf with reasonable stats
@@ -585,14 +585,17 @@ class WolfManager {
             
             this.wolves[newPos] = tempWolf;
             localSuccessfulMigrants++;
-          }
-          
-          if (localSuccessfulMigrants > 0) {
-            console.log(`LOUP: ${localSuccessfulMigrants} wolves successfully migrated into the ecosystem`);
-            // TRACKING: Add this line to track migrations
-            this.migrationCount += localSuccessfulMigrants;
-          }
         }
+        
+        if (localSuccessfulMigrants > 0) {
+          console.log(`LOUP: ${localSuccessfulMigrants} wolves successfully migrated into the ecosystem`);
+          // Track migrations for statistics
+          this.migrationCount = (this.migrationCount || 0) + localSuccessfulMigrants;
+          console.log(`LOUP: Total wolf migrations this year: ${this.migrationCount}`);
+        }
+      }
+      
+      return this.migrationCount || 0; // Return the count for easier debugging
     }
 
     /**
@@ -629,6 +632,8 @@ class WolfManager {
         // Get basic statistics
         const baseStats = this.getStatistics();
         
+        console.log("LOUP: Detailed stats - Wolf migrations:", this.migrationCount || 0);
+        
         // Return enhanced statistics
         return {
           ...baseStats,
@@ -636,7 +641,7 @@ class WolfManager {
           ageDeaths: this.ageDeath,
           starvationDeaths: this.starvationDeath,
           
-          // Additional metrics - use defaults if not tracking yet
+          // Explicitly set migration count, with fallback
           migratedCount: this.migrationCount || 0,
           reproducedCount: this.reproductionCount || 0,
           averageHuntingSuccess: this.huntingAttempts > 0 

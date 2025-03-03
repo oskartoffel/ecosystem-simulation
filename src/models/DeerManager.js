@@ -448,13 +448,13 @@ class DeerManager {
         const migrantCount = Math.max(0, Math.round(baseMigrants * scaledFactor * populationBoost));
         
         if (migrantCount > 0) {
-          console.log(`REH: Migration - attempting to add ${migrantCount} deer`);
-          
-          let localSuccessfulMigrants = 0; // Changed variable name to avoid conflicts
-          for (let i = 0; i < migrantCount; i++) {
-            let newPos = this.findEmptyPosition();
-            if (newPos === -1) {
-              break;
+            console.log(`REH: Migration - attempting to add ${migrantCount} deer`);
+            
+            let localSuccessfulMigrants = 0;
+            for (let i = 0; i < migrantCount; i++) {
+              let newPos = this.findEmptyPosition();
+              if (newPos === -1) {
+                break;
             }
             
             // Create a mature deer with reasonable stats
@@ -472,10 +472,12 @@ class DeerManager {
           
           if (localSuccessfulMigrants > 0) {
             console.log(`REH: ${localSuccessfulMigrants} deer successfully migrated in`);
-            // TRACKING: Add this line to track migrations
-            this.migrationCount += localSuccessfulMigrants;
+            // Track migrations for statistics
+            this.migrationCount = (this.migrationCount || 0) + localSuccessfulMigrants;
+            console.log(`REH: Total deer migrations this year: ${this.migrationCount}`);
           }
         }
+        return this.migrationCount || 0; // Return the count for easier debuggin
     }
 
     /**
@@ -511,6 +513,8 @@ class DeerManager {
         // Get basic statistics
         const baseStats = this.getStatistics();
         
+        console.log("REH: Detailed stats - Deer migrations:", this.migrationCount || 0);
+        
         // Return enhanced statistics
         return {
           ...baseStats,
@@ -519,7 +523,7 @@ class DeerManager {
           starvationDeaths: this.starvationDeath,
           predationDeaths: this.predationDeath,
           
-          // Additional metrics - use defaults if not tracking yet
+          // Explicitly set migration count, with fallback
           migratedCount: this.migrationCount || 0,
           reproducedCount: this.reproductionCount || 0,
           averageForagingSuccess: this.foragingAttempts > 0 
